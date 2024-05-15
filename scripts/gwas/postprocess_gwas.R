@@ -1,9 +1,12 @@
+# load required packages
 library(tidyverse)
 library(data.table)
 
+
 # command args
 args <- commandArgs(trailingOnly = TRUE)
-pheno <- args[1]
+pheno <- args[1] #{pheno}
+ss_path <- paste0("../data/processed/gwas/", pheno)
 
 
 ### Define functions
@@ -44,58 +47,27 @@ make_qq <- function(data, pval_col, main=""){
 
 
 ### Read in summary stats and subset to columns of interest
+ss <- fread(paste0(ss_path, ".gwas")) %>% rename(CHR="#CHROM") %>%
+  mutate(across(c(CHR, P), ~ as.numeric(.)))
 
-ss_cols <- c(
-  CHR = "CHR", SNP = "RSID", POS = "POS",
-  EA = "Effect_Allele", NEA = "Non_Effect_Allele", AF = "AF",
-  N = "N_Samples", P_marg = "P")
-
-
-top_loci <- read_tsv(paste0("../data/processedg/gwas/", pheno, ".loci.clumped"), 
-                     col_names=F, col_types="c")[[1]]
+# File storage
+plot_dir <- paste0(dirname(ss_path), "/gwas_plots")
+system(paste0("mkdir -p ", plot_dir))
 
 
-# LEFT HERE 
-ss_df <- fread(filepath, stringsAsFactors=F, data.table=F) %>%
-  select(all_of(ss_cols), matches("^Beta")) %>%
-  mutate(across(contains("P_"), ~ as.numeric(.))) %>%
-  filter(SNP %in% high_qual_variants)
+### Create Manhattan Plot
 
-
-### Prepare files for downstream analysis
-
-beta_col = "Beta_Marginal"
-p_col = "P_marg"
-pgs_dir <- paste0(gwas_dir, "/../pgs")
-ss_df %>%
-  filter(.data[[p_col]] < 0.05) %>%
-  select(SNP, CHR, POS, EA, NEA, beta = {{beta_col}}, P = {{p_col}}) %>%
-  group_by(SNP) %>%
-  arrange(P) %>%
-  slice(1) %>%
-  ungroup() %>%
-  write_tsv(paste0(pgs_dir, "/", y, "_pgsInput"))
-
-ldsc_dir <- paste0(gwas_dir, "/../ldsc")
-ss_df %>%
-  select(SNP, CHR, POS, EA, NEA, AF, N, Beta = {{beta_col}}, P = {{p_col}}) %>% 
-  group_by(SNP) %>%
-  arrange(P) %>%
-  slice(1) %>%
-  ungroup() %>%
-  write_tsv(paste0(ldsc_dir, "/", y, "_ldscInput"))
+pdf(paste0(plot_dir, "/", pheno, "_manhattan.pdf"), height = 5, width = 9)
+qqman::manhattan(x=ss %>% filter(P<0.05), chr="CHR", bp="POS", p="P", snp="ID")
+dev.off()
 
 
 ### Create Q-Q plot
 
-qq_dir <- paste0(dirname(filepath), "/qq_plots/")
-system(paste0("mkdir -p ", qq_dir))
-write(calc_lambda(ss_df$robust_P_marg), paste0(qq_dir, gsub("_merged|\\.tbl", "_lambda", basename(filepath))))
-plot_filepath <- paste0(qq_dir, gsub("_merged|\\.tbl", "_QQ.pdf", basename(filepath)))
-pdf(file = plot_filepath)
-make_qq(ss_df, "P_marg")
+write(calc_lambda(ss$P), paste0(plot_dir, "/", pheno, "_lambda"))
+pdf(paste0(plot_dir, "/", pheno, "_qq.pdf"))
+make_qq(ss, "P")
 dev.off()
-robust_plot_filepath <- paste0(qq_dir, gsub("_merged|\\.tbl", "_robust_QQ.pdf", basename(filepath)))
-pdf(file = robust_plot_filepath)
-make_qq(ss_df, "robust_P_marg")
-dev.off()
+
+##EOF
+

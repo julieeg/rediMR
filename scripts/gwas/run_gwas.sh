@@ -45,7 +45,7 @@ head ../data/processed/gwas/${pheno}_chr${CHR}.txt
 
 ## Run GWAS, by chromosome
 ../opt/plink2 \
-	--bgen ${scratch}/chr${CHR}_sel_test.bgen ref-first \
+	--bgen ${scratch}/chr${CHR}_sel.bgen ref-first \
 	--sample ${ukb_sample_dir}/ukb27892_imp_chrAUT_v3_s487395.sample \
 	--id-delim \
 	--glm \
@@ -59,13 +59,9 @@ head ../data/processed/gwas/${pheno}_chr${CHR}.txt
 	--mind 0.2 \
 	--memory 50000 \
 	--threads 8 \
-	--out ../data/processed/gwas/chr${CHR}_test \
-&& mv ../data/processed/gwas/chr${CHR}_test.${pheno}.glm.linear ../data/processed/gwas/${pheno}_chr${CHR}_test.gwas
-
-
+	--out ../data/processed/gwas/chr${CHR} \
+&& mv ../data/processed/gwas/chr${CHR}.${pheno}.glm.linear ../data/processed/gwas/${pheno}_chr${CHR}.gwas \ 
+&& rm ../data/processed/gwas/${pheno}_chr${CHR}.txt
 
 #EOF
-
-
-
 
