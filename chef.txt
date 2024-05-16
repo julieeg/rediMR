@@ -28,3 +28,4 @@ for FOOD in raw_veg cooked_veg fresh_fruit; do
 	qsub ../scripts/rediMR/run_rediMR.sh ${FOOD} CVD tag 
 	qsub ../scripts/rediMR/run_rediMR.sh ${FOOD} MDD tag 
 done
+

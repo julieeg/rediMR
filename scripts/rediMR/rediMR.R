@@ -147,8 +147,9 @@ cat("Calculating pctBchange when adjusting for ALL covariates ... ")
 
 # For eacn SNP, tabulate pctBchange when adjusting for ALL covariates
 tab_pctBchangeAllCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) {
-  pctBchange.fun(pheno=pheno, snp=snp, adjCovar=paste0(adjCovars, collapse="+"), replace_covar_name = "All_Covariates", data=dat) 
-}, mc.cores = 8 )) %>% mutate(RefinedSet = ifelse(abs(B_pctChange) < pctBdeltIncl,1,0)) 
+  pctBchange.fun(pheno=pheno, snp=snp, adjCovar=paste0(adjCovars, collapse="+"), 
+                 replace_covar_name = "All_Covariates", data=dat)}, mc.cores = 8 )) %>% 
+  mutate(RefinedSet = ifelse(abs(B_pctChange) < pctBdeltIncl,1,0)) 
 
 
 # Write results to csv
@@ -168,8 +169,8 @@ cat("Calculating pctBchange when adjusting for EACH covariate ... ")
 # For each snp, tabulate pctBchange when adjusting for EACH covariate
 tab_pctBchangeByCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) { 
   do.call(rbind.data.frame, mclapply(nCovars.l, function(i) {
-    pctBchange.fun(pheno=pheno, snp=snp, adjCovar=names(adjCovarNames)[i], replace_covar_name=adjCovarNames[[i]], data=dat)
-  }, mc.cores = 8))  }, mc.cores = 8))../
+    pctBchange.fun(pheno=pheno, snp=snp, adjCovar=names(adjCovarNames)[i], 
+                   replace_covar_name=adjCovarNames[[i]], data=dat) }, mc.cores = 8))  }, mc.cores = 8))
 
 
 # Write results to csv
@@ -185,16 +186,18 @@ head(tab_pctBchangeByCov)
 ## ReDi MR Plots ##
 ###################
 
+cat (paste0("Making ReDiMR plots."))
+
 palettes <- list(NatComms=paletteer_d("ggsci::nrc_npg", n=10))
 
 # set default ggplot theme
 ggthemeF <- theme(panel.grid.minor.y = element_blank(), 
                   panel.grid.minor.x = element_blank(), 
-                  axis.text = element_text(size=11, color="black", hjust=1),
-                  axis.title = element_text(face = "bold", size=11, vjust=1.5),
-                  plot.title=element_text(size=12),
-                  legend.position = "right", legend.box.background = element_rect(color = "black"),
-                  legend.text = element_text(size=10), legend.title = element_text(face="bold", size=10))
+                  axis.text = element_text(color="black", hjust=1),
+                  #axis.title = element_text(face = "bold", size=11, vjust=1.5),
+                  #plot.title=element_text(size=12),
+                  #legend.text = element_text(size=10), legend.title = element_text(face="bold", size=10),
+                  legend.position = "right", legend.box.background = element_rect(color = "black"))
 
 
 # Dot plot of pctBchange when adjusting for ALL covariates
@@ -221,7 +224,7 @@ dotAll <- tab_pctBchangeAllCov %>%
 palettes$CovarGroups=c(brewer.pal(9,"Oranges")[4:6], brewer.pal(9, "Greens")[5:4], 
    brewer.pal(9, "Blues")[5:6],  brewer.pal(9, "Purples")[c(8:4)], brewer.pal(9, "PiYG")[1:3], brewer.pal(9, "PuRd")[5:6])
 
-yscale <- ceiling(max(abs(tab_pctBchangeByCov$B_pctChange))*1.15)
+yscale <- ceiling(max(abs(tab_pctBchangeByCov$B_pctChange))*1.10)
 dotCov <- tab_pctBchangeByCov %>%
   mutate(covar=factor(covar, levels=adjCovarNames)) %>%
   arrange(covar) %>%
@@ -232,7 +235,7 @@ dotCov <- tab_pctBchangeByCov %>%
   scale_y_continuous(limits=c(-yscale, yscale)) +
   geom_hline(yintercept = 0, color = "black") + 
   geom_hline(yintercept = c(-10, 10), color = "black", linetype = "dashed") + 
-  geom_point(size=1.35, position = position_jitter(0.25)) + 
+  geom_point(size=1.15, position = position_jitter(0.25)) + 
   scale_color_manual(values = palettes$CovarGroups, name = "Adjusted\nCovariate") +
   #scale_y_discrete(labels=rev(plot_B_pct_change_full_model_dat$snp)) +
   ylab(" % |Beta| change from Base model") + xlab(" ") + 
@@ -241,10 +244,21 @@ dotCov <- tab_pctBchangeByCov %>%
 
 
 # Save plots as PDF
-pdf(paste0(outDir, "/", pheno.tag, "_plotOutputs.pdf"), height = 5.5, width = 7.5)
+pdf(paste0(outDir, "/", pheno.tag, "_plotBpctAllCov.pdf"), height = 5.5, width = 6)
 dotAll
+dev.off()
+
+pdf(paste0(outDir, "/", pheno.tag, "_plotBpctByCov.pdf"), height = 4.5, width = 6)
 dotCov
 dev.off()
+
+cat(paste0("Done making plots written to ", outDir, "/", pheno.tag, "_plotOutputs.pdf"))
+
+cat("
+Congratulatulations!! You completed ReDiMR Step 1 (SNP Refinement).
+
+    --> You are now ready to proceed to ReDiMR Step 2-Mendelian Randomization. Good luck!")
+
 
 
 ## EOF - TEMPORARY

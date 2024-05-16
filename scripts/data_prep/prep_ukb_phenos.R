@@ -581,7 +581,8 @@ phenos <- phenos_id %>%
   left_join(diet_all_id, by="id") %>%
   left_join(anc_rel_id, by="id") %>%
   filter(!(id %in% withdrawn_consent)) %>%
-  mutate(id = format(id, scientific=FALSE)) 
+  mutate(id = format(id, scientific=FALSE)) %>%
+  mutate(IID = id, ., before=id)
 
 
 # all participants
@@ -603,28 +604,27 @@ phenos %>%
 # unrelated & by Ancestry
 phenos %>%
   filter(unrelated == TRUE & ancestry == "EUR") %>%
-  write_csv("../data/processed/ukb_phenos_unrelated_EUR.csv")
+  write.table("../data/processed/ukb_phenos_unrelated_EUR.txt")
 
- 
 phenos %>%
   filter(unrelated == TRUE & ancestry == "AFR") %>%
-  write_csv("../data/processed/ukb_phenos_unrelated_AFR.csv")
+  write.table("../data/processed/ukb_phenos_unrelated_AFR.txt")
 
 phenos %>%
   filter(unrelated == TRUE & ancestry == "AMR") %>%
-  write_csv("../data/processed/ukb_phenos_unrelated_AMR.csv")
+  write.table("../data/processed/ukb_phenos_unrelated_AMR.txt")
 
 phenos %>%
   filter(unrelated == TRUE & ancestry == "CSA") %>%
-  write_csv("../data/processed/ukb_phenos_unrelated_CSA.csv")
+  write.table("../data/processed/ukb_phenos_unrelated_CSA.txt")
 
 phenos %>%
   filter(unrelated == TRUE & ancestry == "EAS") %>%
-  write_csv("../data/processed/ukb_phenos_unrelated_EAS.csv")
+  write.table("../data/processed/ukb_phenos_unrelated_EAS.txt")
 
 phenos %>%
   filter(unrelated == TRUE & ancestry == "MID") %>%
-  write_csv("../data/processed/ukb_phenos_unrelated_MID.csv")
+  write.table("../data/processed/ukb_phenos_unrelated_MID.txt")
 
 
 print("Done preparing UKB Phenotype data. Datasets are ready for analysis.")
