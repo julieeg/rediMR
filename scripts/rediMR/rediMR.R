@@ -9,13 +9,16 @@
 
 # load required packages
 library(tidyverse) ; library(data.table) ; library(dplyr) ; library(parallel)
-library(paletteer) 
+library(paletteer) ; library(RColorBrewer)
 
 # command args
 args <- commandArgs(trailingOnly = TRUE)
 pheno <- args[1]
-ssInput <- paste0("../data/processed/rediMR/", pheno, "/", pheno, "_ssInput.csv")  #args[2]
-datInput <- paste0("../data/processed/rediMR/", pheno, "/", pheno, "_datInput.rda") #args[3]
+tag <- args[2]
+
+pheno.tag <- paste0(pheno, ".", tag)
+ssInput <- paste0("../data/processed/rediMR/", pheno, "/", pheno.tag, "_ssInput.csv")  #args[2]
+datInput <- paste0("../data/processed/rediMR/", pheno, "/", pheno.tag, "_datInput.rda") #args[3]
 outDir <- dirname(datInput) #args[4]
 pctBdeltIncl <- 20 #args[5]
 
@@ -49,9 +52,10 @@ adjCovarNames <- c(
     pa_met_excess_level.lab="Physical Activity", income_level.lab = "Income", 
     educ_level.lab="Education", bmi="BMI", waist2hip="Waist-to-hip",
     dietPC1="Diet Pattern PC1", dietPC2="Diet Pattern PC2", dietPC3="Diet Pattern PC3",
-    dietPC4="Diet Pattern PC4", dietPC5="Diet Pattern PC5", dietPC6="Diet Pattern PC6", 
-    dietPC7="Diet Pattern PC7", dietPC8="Diet Pattern PC8", dietPC9="Diet Pattern PC9", 
-    dietPC10="Diet Pattern PC10"
+    dietPC4="Diet Pattern PC4", dietPC5="Diet Pattern PC5", 
+    #`dietPC1+dietPC2+dietPC3+dietPC4+diePC5`="Top 5 Diet Patterns", 
+    dietPC6="Diet Pattern PC6", dietPC7="Diet Pattern PC7", dietPC8="Diet Pattern PC8", 
+    dietPC9="Diet Pattern PC9", dietPC10="Diet Pattern PC10"
 )
 
 # Write as lists
@@ -59,6 +63,8 @@ adjCovars.l <- as.list(adjCovars)
 adjCovarNames.l <- as.list(adjCovarNames)
 
 nCovars.l <- as.list(1:length(adjCovarNames.l))
+
+
 
 ############################################################
 ## Build function to calculate pctBchange from Base Model ##
@@ -98,10 +104,10 @@ ss<-fread(ssInput) %>% filter(LOCI == 1)
 
 # Load phenotype/dosage data
 dat<-readRDS(datInput)
-head(dat)
 
 # list of snps
 snps <- names(dat %>% select(contains(ss$SNP)))
+
 
 
 #######################################
@@ -146,9 +152,9 @@ tab_pctBchangeAllCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) {
 
 
 # Write results to csv
-fwrite(tab_pctBchangeAllCov, file = paste0(outDir, "/", pheno, "_pctBchangeAllCov.csv"))
+fwrite(tab_pctBchangeAllCov, file = paste0(outDir, "/", pheno.tag, "_pctBchangeAllCov.csv"))
 
-cat (paste0("Done. Result written to ", paste0(outDir, "/", pheno, "_pctBchangeAllCov.csv")))
+cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno.tag, "_pctBchangeAllCov.csv")))
 head(tab_pctBchangeAllCov)
 
 
@@ -163,11 +169,86 @@ cat("Calculating pctBchange when adjusting for EACH covariate ... ")
 tab_pctBchangeByCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) { 
   do.call(rbind.data.frame, mclapply(nCovars.l, function(i) {
     pctBchange.fun(pheno=pheno, snp=snp, adjCovar=names(adjCovarNames)[i], replace_covar_name=adjCovarNames[[i]], data=dat)
-  }, mc.cores = 8))  }, mc.cores = 8))
+  }, mc.cores = 8))  }, mc.cores = 8))../
 
 
 # Write results to csv
-fwrite(tab_pctBchangeByCov, file = paste0(outDir, "/", pheno, "_pctBchangeByCov.csv"))
+fwrite(tab_pctBchangeByCov, file = paste0(outDir, "/", pheno.tag, "_pctBchangeByCov.csv"))
+
+cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno.tag, "_pctBchangeByCov.csv")))
+head(tab_pctBchangeByCov)
 
 
+
+
+###################
+## ReDi MR Plots ##
+###################
+
+palettes <- list(NatComms=paletteer_d("ggsci::nrc_npg", n=10))
+
+# set default ggplot theme
+ggthemeF <- theme(panel.grid.minor.y = element_blank(), 
+                  panel.grid.minor.x = element_blank(), 
+                  axis.text = element_text(size=11, color="black", hjust=1),
+                  axis.title = element_text(face = "bold", size=11, vjust=1.5),
+                  plot.title=element_text(size=12),
+                  legend.position = "right", legend.box.background = element_rect(color = "black"),
+                  legend.text = element_text(size=10), legend.title = element_text(face="bold", size=10))
+
+
+# Dot plot of pctBchange when adjusting for ALL covariates
+xscale <- ceiling(max(abs(tab_pctBchangeAllCov$B_pctChange))*1.15)
+
+dotAll <- tab_pctBchangeAllCov %>%
+  arrange(B_pctChange) %>%
+  mutate(SNP=factor(snp, levels=snp), RefinedSet=factor(RefinedSet, levels=c("0","1"))) %>%
+  ggplot(aes(x=B_pctChange, y = SNP, color = RefinedSet)) + 
+  theme_bw() + ggthemeF + 
+  scale_x_continuous(limits=c(-xscale, xscale)) +
+  geom_vline(xintercept = 0, color = "black") + 
+  geom_vline(xintercept = c(-20, 20), color = "black", linetype = "dashed") + 
+  geom_point(size=2.5, position = position_jitter(0)) + 
+  scale_color_manual(values = c(palettes$NatComms[1], palettes$NatComms[3]), 
+                     name = "Refined Set", labels=c("Excluded", "Included")) +
+  #scale_y_discrete(labels=rev(plot_B_pct_change_full_model_dat$snp)) +
+  xlab(" % |Beta| change from Base model") + ylab(" ") +
+  ggtitle(paste0("Refined set of loci for ", pheno, "\n<", pctBdeltIncl, "% change in B"))
+
+
+# Dot plot of pctBchange when adjusting for EACH covariate
+
+palettes$CovarGroups=c(brewer.pal(9,"Oranges")[4:6], brewer.pal(9, "Greens")[5:4], 
+   brewer.pal(9, "Blues")[5:6],  brewer.pal(9, "Purples")[c(8:4)], brewer.pal(9, "PiYG")[1:3], brewer.pal(9, "PuRd")[5:6])
+
+yscale <- ceiling(max(abs(tab_pctBchangeByCov$B_pctChange))*1.15)
+dotCov <- tab_pctBchangeByCov %>%
+  mutate(covar=factor(covar, levels=adjCovarNames)) %>%
+  arrange(covar) %>%
+  ggplot(aes(x=covar, y = B_pctChange, color = covar)) + 
+  theme_bw() + ggthemeF + 
+  theme(axis.text.x = element_text(angle=35, vjust=0.99, size=10),
+        legend.position = "none") +
+  scale_y_continuous(limits=c(-yscale, yscale)) +
+  geom_hline(yintercept = 0, color = "black") + 
+  geom_hline(yintercept = c(-10, 10), color = "black", linetype = "dashed") + 
+  geom_point(size=1.35, position = position_jitter(0.25)) + 
+  scale_color_manual(values = palettes$CovarGroups, name = "Adjusted\nCovariate") +
+  #scale_y_discrete(labels=rev(plot_B_pct_change_full_model_dat$snp)) +
+  ylab(" % |Beta| change from Base model") + xlab(" ") + 
+  ggtitle(paste0(pheno, " % |Beta| change by SNP and covariate"))
+
+
+
+# Save plots as PDF
+pdf(paste0(outDir, "/", pheno.tag, "_plotOutputs.pdf"), height = 5.5, width = 7.5)
+dotAll
+dotCov
+dev.off()
+
+
+## EOF - TEMPORARY
+
+#*add quadrant plot??
+#*
 

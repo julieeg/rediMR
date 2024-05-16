@@ -349,11 +349,8 @@ check_num_valid_24hr <- function(df) {
 
 
 # nutrient variables
-diet_vars <- c("TCALS_raw", "TCALS", "CHO", "CHO_kcal", "CHO_pct", 
-               "FAT", "FAT_kcal", "FAT_pct", "MUFA", "SFA", "SFA_pct", "MUFA", 
-               "MUFA_pct", "PUFA", "PUFA_pct", "PRO", "PRO_kcal", "PRO_pct", "ALC",
-               "FREE_SUGARS", "FIBER",  "GLUCOSE", 
-               "CHO2FIB", "CHO2FIB_log", "FIB2CHO", "FIB2CHO_sqrt")
+diet_vars <- c("TCALS_raw", "TCALS", "CHO", "FAT",  "MUFA", "SFA", "PUFA", "PRO", 
+               "ALC", "FIBER",  "CHO2FIB", "CHO2FIB_log", "FIB2CHO", "FIB2CHO_sqrt")
 
 ## merge "Typical diet yesterday" with nutrient intake vars 
 diet_id <- left_join(fread("/humgen/florezlab/UKBB_app27892/UKBB_app27892_download_aug_2022/ukb670995.tab.gz", 
@@ -365,33 +362,18 @@ diet_id <- left_join(fread("/humgen/florezlab/UKBB_app27892/UKBB_app27892_downlo
   
   mutate(TCALS_raw = fetch_diet_fields("26002", .),
          CHO = fetch_diet_fields("26013", .),
-         CHO_kcal = fetch_diet_fields("26013", .),
-         CHO_pct = fetch_diet_fields("26013", .),
-         FAT = fetch_diet_fields("26008", .),
-         FAT_kcal = fetch_diet_fields("26008", .),
-         FAT_pct = fetch_diet_fields("26008", .),
          SFA = fetch_diet_fields("26014", .),
-         SFA_kcal = fetch_diet_fields("26014", .),
-         SFA_pct = fetch_diet_fields("26014", .),
          MUFA = fetch_diet_fields("26032", .),
-         MUFA_kcal = fetch_diet_fields("26032", .),
-         MUFA_pct = fetch_diet_fields("26032", .),
          PUFA_N3 = fetch_diet_fields("26015", .),
          PUFA_N6 = fetch_diet_fields("26016", .),
          PRO = fetch_diet_fields("26005", .),
-         PRO_kcal = fetch_diet_fields("26005", .),
-         PRO_pct = fetch_diet_fields("26005", .),
          ALC = fetch_diet_fields("26030", .),
-         FREE_SUGARS = fetch_diet_fields("26011", .),
          FIBER = fetch_diet_fields("26017", .),
-         GLUCOSE = fetch_diet_fields("26045", .),
          num_recalls = check_num_valid_24hr(.),
          ) %>%
   
   mutate(TCALS_raw = TCALS_raw / 4.18,  # Energy from kJ to kcal, likely includes alcohol
          PUFA = PUFA_N3+PUFA_N6,
-         PUFA_kcal = PUFA_N3 + PUFA_N6,
-         PUFA_pct = PUFA_kcal,
          
          #diet quality measures: CHO / FIBER ratios
          CHO2FIB = ifelse(FIBER >0, CHO / FIBER, NA),
@@ -400,14 +382,8 @@ diet_id <- left_join(fread("/humgen/florezlab/UKBB_app27892/UKBB_app27892_downlo
   mutate(
     "CHO2FIB_sqrt" = sqrt(CHO2FIB), "FIB2CHO_sqrt" = sqrt(FIB2CHO),
     "CHO2FIB_log" = log(CHO2FIB), "FIB2CHO_log" = log(FIB2CHO)) %>%
-         
-  mutate_at(vars(CHO_kcal, CHO_pct, PRO_kcal, PRO_pct), ~. * 4, ) %>%  # Nutrients from g to kcals (other than alcohol)
-  mutate_at(vars(FAT_kcal, FAT_pct, SFA_kcal, MUFA_kcal, PUFA_kcal), ~. * 9) %>%
-  mutate(TCALS = (CHO_kcal + PRO_kcal + FAT_kcal)) %>%
-  
-  mutate_at(vars(CHO_pct, FAT_pct, PRO_pct, SFA_pct, MUFA_pct, PUFA_pct), ~ (. /TCALS) *100) %>%
-  
-  mutate_at(vars(all_of(diet_vars)), remove_outliers.fun) %>%
+
+  mutate(TCALS = (CHO*4 + PRO*4 + FAT*9)) %>%
   select(id=f.eid, all_of(diet_vars))
 
 
@@ -550,11 +526,15 @@ ffq_id <- ffq_id %>%
     )
 
 
-
 ## Combine diet datasets --------------------------------------------------
 
 diet_all_id <- diet_id %>% 
-  left_join(., ffq_id, by = "id") 
+  left_join(., ffq_id, by = "id") %>%
+  
+  ## Replace values >5SD with NA********************
+  mutate_at(vars(all_of(diet_vars)), ~function(x) remove_outliers.fun(x, SDs=5)) %>%
+  mutate_at(vars(all_of(ffq_fields)), ~function(x) remove_outliers.fun(x, SDs=5))
+
 
 print(paste0("Dietary data from UKB FFQs prepared for N = ", nrow(diet_all_id), " participants"))
 
@@ -578,6 +558,14 @@ anc_rel_id <- fread("/humgen/florezlab/UKBB_app27892/ukbreturn2442/all_pops_non_
 
 print("Breakdown of available data by relatedness & ancestry from PanUKBB: ")
 print(table(anc_rel_id$unrelated, anc_rel_id$ancestry))
+
+
+
+######################################
+## Replace diet values >5SD with NA ##
+#####################################
+
+
 
 
 

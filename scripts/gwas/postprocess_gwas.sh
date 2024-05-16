@@ -19,16 +19,16 @@ use R-4.1
 
 
 # Merge chromosome-specific summary statistics
-head -1 ${ss_prefix}_chr22.gwas > ${ss_prefix}.gwas
+head -1 ${ss_prefix}_chr22.gwas > ${ss_prefix}.gwas.${tag}
 for i in {1..22}; do
-	echo "Gathering summary status from ${ss_prefix}_chr${i}.gwas ..."
-	awk '{ if ($7 == "ADD") {print $0} }' ${ss_prefix}_chr${i}.gwas >> ${ss_prefix}.gwas
+	echo "Gathering summary status from ${ss_prefix}_chr${i}.gwas.${tag} ..."
+	awk '{ if ($7 == "ADD") {print $0} }' ${ss_prefix}_chr${i}.gwas.${tag} >> ${ss_prefix}.gwas.${tag}
 done
 
 
 
 # Make gwas plots
-Rscript ../scripts/gwas/postprocess_gwas.R ${pheno}
+Rscript ../scripts/gwas/postprocess_gwas.R ${pheno} ${tag}
 
 
 

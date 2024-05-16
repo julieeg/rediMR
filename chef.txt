@@ -13,11 +13,18 @@ qsub ../scripts/data_prep/prep_ukb_phenos.sh
 
 ## Run GWAS for select diet traits
 qsub -t 1-22 ../scripts/gwas/prep_gwas.sh
-for FOOD in raw_veg cooked_veg; do qsub -t 1-22 ../scripts/gwas/run_gwas.sh ${FOOD}; done
+for FOOD in raw_veg cooked_veg fresh_fruit dried_fruit ; do qsub -t 1-22 ../scripts/gwas/run_gwas.sh ${FOOD} tag; done
 for FOOD in raw_veg cooked_veg fresh_fruit; do qsub ../scripts/gwas/postprocess_gwas.sh ${FOOD}; done
 
 
 ## Run_ReDiMR.sh (loci, raw genotype files, formatted phenotype file [with pheno + covars])
-for FOOD in raw_veg cooked_veg fresh_fruit; do qsub ../scripts/rediMR/run_rediMR.sh ${FOOD}; done 
+for FOOD in raw_veg cooked_veg fresh_fruit; do qsub ../scripts/rediMR/run_rediMR.sh ${FOOD} tag; done 
 
-qsub ../scripts/rediMR/run_rediMR.sh raw_veg
+
+## Run series of MR for [outcome traits]
+for FOOD in raw_veg cooked_veg fresh_fruit; do 
+	qsub ../scripts/rediMR/run_rediMR.sh ${FOOD} T2D tag 
+	qsub ../scripts/rediMR/run_rediMR.sh ${FOOD} CKD tag 
+	qsub ../scripts/rediMR/run_rediMR.sh ${FOOD} CVD tag 
+	qsub ../scripts/rediMR/run_rediMR.sh ${FOOD} MDD tag 
+done

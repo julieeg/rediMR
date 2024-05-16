@@ -6,6 +6,7 @@ library(data.table)
 # command args
 args <- commandArgs(trailingOnly = TRUE)
 pheno <- args[1] #{pheno}
+tag <- args[2]
 ss_path <- paste0("../data/processed/gwas/", pheno)
 
 
@@ -47,7 +48,7 @@ make_qq <- function(data, pval_col, main=""){
 
 
 ### Read in summary stats and subset to columns of interest
-ss <- fread(paste0(ss_path, ".gwas")) %>% rename(CHR="#CHROM") %>%
+ss <- fread(paste0(ss_path, ".gwas.", tag)) %>% rename(CHR="#CHROM") %>%
   mutate(across(c(CHR, P), ~ as.numeric(.)))
 
 # File storage
@@ -57,7 +58,7 @@ system(paste0("mkdir -p ", plot_dir))
 
 ### Create Manhattan Plot
 
-pdf(paste0(plot_dir, "/", pheno, "_manhattan.pdf"), height = 5, width = 9)
+pdf(paste0(plot_dir, "/", pheno, ".",tag, "_manhattan.pdf"), height = 5, width = 9)
 qqman::manhattan(x=ss %>% filter(P<0.05), chr="CHR", bp="POS", p="P", snp="ID")
 dev.off()
 
@@ -65,7 +66,7 @@ dev.off()
 ### Create Q-Q plot
 
 write(calc_lambda(ss$P), paste0(plot_dir, "/", pheno, "_lambda"))
-pdf(paste0(plot_dir, "/", pheno, "_qq.pdf"))
+pdf(paste0(plot_dir, "/", pheno, ".", tag, "_qq.pdf"))
 make_qq(ss, "P")
 dev.off()
 

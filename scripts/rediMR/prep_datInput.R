@@ -5,90 +5,31 @@ library(tidyverse) ; library(data.table)
 # command args
 args <- commandArgs(trailingOnly = T)
 pheno <- args[1]
-datInput <- paste0("../data/processed/rediMR/", pheno, "/", pheno, "_datInput.tmp") # args[2]
-ssInput <- paste0("../data/processed/rediMR/", pheno, "/", pheno, "_ssInput.csv") 
-datOutput <- dirname(datInput)
+tag <- args[2]
+
+pheno.tag <- paste0(pheno, ".", tag)
+
+datInput <- paste0("../data/processed/rediMR/", pheno, "/", pheno.tag, "_datInput.tmp.rda") # args[2]
+ssInput <- paste0("../data/processed/rediMR/", pheno, "/", pheno.tag, "_ssInput.tmp.csv") 
+outDir <- dirname(datInput)
 
 
-## Load datInput.tmp file
-dat <- fread(datInput)
+## Load Input files
+dat <- readRDS(datInput)
 ss <- fread(ssInput)
 
 source("../scripts/basic_functions.R")
 
 
-#########################
-## Compile dosage data ##
-#########################
+################################
+## Relabel SNPs without rsIDs ##
+################################
 
-dat.geno <- dat %>% select(id, contains(ss$SNP)) %>%
-  # Rename snps within CHR:POS_REF_ALT coding to rsCHR.POS_REF_ALT
-  rename_with(., ~ gsub(":", ".", ifelse(!startsWith(.x, "rs"), paste0("rs", .x), .x))) %>%
-  rename(id=rsid)
+dat <- dat %>% 
+  rename_with( ~ifelse(!startsWith(.x, "rs"), gsub(":", ".", paste0("snp", .x, recycle0 = T)), .x), contains(ss$SNP))
 
-ss %>% mutate(SNP = gsub(":", ".", ifelse(!startsWith(SNP, "rs"), paste0("rs", SNP ), SNP ))) %>%
-  write.csv(ssInput, row.names=F)
-
-
-
-############################################
-##  recode character variables as factors ##
-############################################
-
-## Load & compile ukb phenotype data  -------------------------
-paste("Recoding character variables as meaningful factors ...")
-
-## basic phenotypes  ---------------
-covars <- c(pheno, "age", "sex", paste0("gPC", 1:10), "smoke_level.lab", "alch_freq.lab", 
-            "pa_met_excess_level.lab", "income_level.lab", "educ_level.lab", "bmi", "waist2hip") 
-
-dat.covars <- dat %>%   
-  # Recode no answer/do not know/missing as missing
-  mutate(
-    sex = case_when(sex == 1 ~ "Male", sex == 0 ~ "Female"),
-    smoke_level.lab = case_when(
-      smoke.lab == "No answer" ~ as.character(NA),
-      smoke.lab != "No answer" ~ as.character(smoke.lab),
-      TRUE ~ as.character(NA)),
-    alch_freq.lab = case_when(
-      alch_freq.lab == "Prefer not to answer" ~ as.character(NA),
-      alch_freq.lab != "Prefer not to answer" ~ as.character(alch_freq.lab),
-      TRUE ~ as.character(NA)),
-    income_level.lab=case_when(
-      income == "Prefer not to answer" ~ as.character(NA),
-      income == "Do not know" ~ as.character(NA),
-      income != "Prefer not to answer" & income != "Do not know" ~ as.character(income),
-      TRUE ~ as.character(NA)),
-    educ_level.lab = case_when(
-      educ_level.lab == "Prefer not to answer" ~ as.character(NA),
-      educ_level.lab != "Prefer not to answer" ~ as.character(educ_level.lab),
-      TRUE ~ as.character(NA))) %>% 
-  # Add descritptive labels & levels
-  mutate(
-    income_level.lab = factor(income_level.lab, 
-                              levels = c("Less than 18,000", "18,000 to 30,999",
-                                         "31,000 to 51,999", "52,000 to 100,000",  
-                                         "Greater than 100,000"),
-                              labels = c("lt_18000", "from_18000_to_30999",
-                                         "from_31000_to_51999", "from_52000_to_100000",  
-                                         "gt_100000")),
-    #Edu levels & yrs based on: https://www.nature.com/articles/s41380-019-0596-9#MOESM1)
-    educ_level.lab = factor(educ_level.lab, 
-                            levels = c("College or university degree", # ~20yrs 
-                                       "NVQ/HND or equivalent", # 2 of 3 years bachelor's degree ~19yrs
-                                       "Other professional qualifications", # e.g., nursing degree, teaching degree ~ 15yrs
-                                       "A/AS levels or equivalent", # 1 year bachelor's degree ~13yrs
-                                       "O/GCSE levels or equivalent", # HS + Associates degree ~10yrs
-                                       "CSEs or equivalent", # completed HS ~10yrs
-                                       "None of the above")), #~7yrs
-    smoke_level.lab = factor(smoke_level.lab, levels = c("Current", "Former", "Never")),
-    alch_freq.lab = factor(alch_freq.lab, ordered = T,
-                           levels = c("Daily or almost daily",
-                                      "3-4 per week", "1-2 per week", "1-3 per month",
-                                      "Special occasions only", "Never")),
-    pa_met_excess_level.lab = factor(pa_met_excess_lvl, ordered = T,
-                               levels = c("Low", "Moderate", "High"))) %>% 
-  select(id, ancestry, c(paste0("gPC", 1:10)), all_of(covars))
+ss %>% mutate(SNP = gsub(":", ".", ifelse(!startsWith(SNP, "rs"), paste0("snp", SNP ), SNP ))) %>%
+  fwrite(gsub(".tmp", "", ssInput), row.names=F)
 
 
 
@@ -127,7 +68,7 @@ vars_for_pca <- dat %>% select(
 
 ## Run PCA & save output as .rda
 diet_pcs <- prcomp(select(vars_for_pca, -id), scale.=T)  # Run PCA
-saveRDS(diet_pcs, paste0(datOutput, "/", pheno, "_dietPCs.rda"))
+saveRDS(diet_pcs, paste0(outDir, "/", pheno.tag, "_dietPCs.rda"))
 
 
 # Extract dietPC scores
@@ -136,10 +77,10 @@ names(dat.dietPCs) <- c("id", paste0("dietPC", 1:ncol(diet_pcs$x)))
 
 
 # Compile diet variables 
-dat.diet <- left_join(vars_for_pca, dat.dietPCs, by = "id")
+#dat.diet <- left_join(vars_for_pca, dat.dietPCs, by = "id")
 
 
-print("Done compiling diet variables.")
+print("Done deriving diet patterns")
 
 
 
@@ -147,15 +88,12 @@ print("Done compiling diet variables.")
 ## Merge data files & Exclude participants with >5SD for continuous variables ##
 ################################################################################
 
-dat.merged <- dat.covars %>% 
-#  left_join(dat.phenoQ, by = "id") %>%
-  left_join(dat.diet, by = "id") %>%
-  left_join(dat.geno, by = "id") 
+# Merge in diet data
+dat.merged <- left_join(dat, dat.dietPCs, by = "id")
 
-
-# Replace with NA values >5SD for pheno
+# Replace pheno values >5SD with NA **CONSIDER WINZORIZING**
 dat.merged <- dat.merged %>%
-  mutate(across(pheno, ~ remove_outliers.fun(.x, SDs=5))) 
+  mutate(across(all_of(pheno), ~ remove_outliers.fun(.x, SDs=5))) 
 
 
 #################################################
@@ -173,16 +111,15 @@ dat.phenoQ <- dat.merged %>% select(id, phenoX=all_of(pheno)) %>%
   select(id, phenoQ) #%>% 
 
 
+
 ############################
 ## Merge data & write rda ##
 ############################
 
 print("Compiling datasets and writing .rda file")
 
-dat.merged <- dat.merged %>% 
-  left_join(dat.phenoQ, by = "id") 
-
-dat.merged %>% saveRDS(paste0(datOutput, "/", pheno, "_datInput.rda"))
+dat.merged <- left_join(dat.merged, dat.phenoQ, by = "id")
+dat.merged %>% saveRDS(paste0(outDir, "/", pheno.tag, "_datInput.rda"))
 
 
 print(paste0("DONE merging phenotype/dosage files for ", pheno))
