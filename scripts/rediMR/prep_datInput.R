@@ -7,10 +7,10 @@ args <- commandArgs(trailingOnly = T)
 pheno <- args[1]
 tag <- args[2]
 
-pheno.tag <- paste0(pheno, ".", tag)
+pheno_tag <- paste0(pheno, "_", tag)
 
-datInput <- paste0("../data/processed/rediMR/", pheno, "/", pheno.tag, "_datInput.tmp.rda") # args[2]
-ssInput <- paste0("../data/processed/rediMR/", pheno, "/", pheno.tag, "_ssInput.tmp.csv") 
+datInput <- paste0("../data/processed/rediMR/", pheno_tag, "_datInput.tmp.rda") # args[2]
+ssInput <- paste0("../data/processed/rediMR/", pheno_tag, "_ssInput.tmp.csv") 
 outDir <- dirname(datInput)
 
 
@@ -40,7 +40,8 @@ ss %>% mutate(SNP = gsub(":", ".", ifelse(!startsWith(SNP, "rs"), paste0("snp", 
 if(gsub(".*_", "", pheno) == "veg") { vars_to_exclude <- c("raw_veg", "cooked_veg") }
 if(gsub(".*_", "", pheno) == "fruit") { vars_to_exclude <- c("fresh_fruit", "dried_fruit") }
 
-paste0("Building diet patterns via PCA WITHOUT: ", paste0(vars_to_exclude, collapse = " and "))
+paste0("Building diet patterns via pca WITHOUT: ", paste0(vars_to_exclude, collapse = " and "))
+
 
 vars_for_pca <- dat %>% select(
   id,
@@ -68,7 +69,7 @@ vars_for_pca <- dat %>% select(
 
 ## Run PCA & save output as .rda
 diet_pcs <- prcomp(select(vars_for_pca, -id), scale.=T)  # Run PCA
-saveRDS(diet_pcs, paste0(outDir, "/", pheno.tag, "_dietPCs.rda"))
+saveRDS(diet_pcs, paste0(outDir, "/", pheno_tag, "_dietPCs.rda"))
 
 
 # Extract dietPC scores
@@ -100,16 +101,27 @@ dat.merged <- dat.merged %>%
 ## Create quantile variable for diet phenotype ##
 #################################################
 
-phenoQs <- quantile(dat.merged %>% select(pheno), probs=seq(0,1,0.25), na.rm=T)
-if(length(unique(phenoQs)) != length(phenoQs)) {
-  phenoQs <- quantile(dat.merged %>% select(pheno), probs=seq(0,1,0.33), na.rm=T)
+cat(paste0("Creating a categorical variable for ", pheno, "... \n"))
+
+# Determine quantiles
+pheno4Qs <- quantile(dat.merged %>% select(all_of(pheno)), probs=seq(0,1,0.25), na.rm=T) ; pheno4Qs
+pheno3Qs <- quantile(dat.merged %>% select(all_of(pheno)), probs=seq(0,1,0.33), na.rm=T) ; pheno3Qs
+if(length(unique(pheno4Qs)) == 4) {
+  cat(paste0("Quartiles for ", pheno, " are unique. --> Defining categories by QUARTILE, as follows: \n")) 
+  phenoQs <- pheno4Qs ; print(phenoQs)
+} else if(length(unique(pheno3Qs)) == 3) {
+  cat(paste0("Quartiles for ", pheno, " are not unique. --> Defining categories by TERTILE, as follows: \n.")) 
+  phenoQs <- pheno3Qs ; print(phenoQs)
+} else {
+  cat(paste0("Neither quartiles nor tertiles for ", pheno, " are unique --> Defining categories by ABOVE/BELOW MEDIAN: \n")) 
+  phenoQs <- dat.merged %>% select(phenoX=all_of(pheno)) %>% filter(complete.cases(phenoX)) %>%
+    summarise(Q50=median(phenoX), Q100=max(phenoX)) ; print(phenoQs)
 }
 
-dat.phenoQ <- dat.merged %>% select(id, phenoX=all_of(pheno)) %>%
-  mutate(phenoQ = cut(phenoX, breaks = phenoQs, labels = c(paste0("Q", 1:(length(phenoQs)-1))), include.lowest=T)) %>%
-  mutate(phenoQ = factor(phenoQ, levels = c(paste0("Q", 1:(length(phenoQs)-1))))) %>%
-  select(id, phenoQ) #%>% 
-
+dat.phenoQ <- dat.merged %>% select(id, phenoX=all_of(pheno)) %>% filter(complete.cases(phenoX)) %>% 
+  mutate(phenoQ = cut(phenoX, breaks = c(phenoQs), labels = F, include.lowest=T)) %>%
+  mutate(phenoQ = as.factor(paste0("Q", phenoQ))) %>%
+  select(id, phenoQ) 
 
 
 ############################
@@ -119,7 +131,7 @@ dat.phenoQ <- dat.merged %>% select(id, phenoX=all_of(pheno)) %>%
 print("Compiling datasets and writing .rda file")
 
 dat.merged <- left_join(dat.merged, dat.phenoQ, by = "id")
-dat.merged %>% saveRDS(paste0(outDir, "/", pheno.tag, "_datInput.rda"))
+dat.merged %>% saveRDS(paste0(outDir, "/", pheno_tag, "_datInput.rda"))
 
 
 print(paste0("DONE merging phenotype/dosage files for ", pheno))

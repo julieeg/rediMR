@@ -1,5 +1,5 @@
 # load required packages
-library(tidyverse)
+library(dplyr)
 library(data.table)
 
 
@@ -7,7 +7,9 @@ library(data.table)
 args <- commandArgs(trailingOnly = TRUE)
 pheno <- args[1] #{pheno}
 tag <- args[2]
-ss_path <- paste0("../data/processed/gwas/", pheno)
+
+pheno_tag=paste0(pheno, "_", tag)
+ss_path <- paste0("../data/processed/gwas/", pheno_tag)
 
 
 ### Define functions
@@ -48,8 +50,12 @@ make_qq <- function(data, pval_col, main=""){
 
 
 ### Read in summary stats and subset to columns of interest
-ss <- fread(paste0(ss_path, ".gwas.", tag)) %>% rename(CHR="#CHROM") %>%
-  mutate(across(c(CHR, P), ~ as.numeric(.)))
+ss <- fread(paste0(ss_path, ".gwas")) %>% rename(CHR="#CHROM") %>%
+  mutate(across(c(CHR, P), ~ as.numeric(.))) %>%
+  select(CHR, POS, ID, REF, ALT, A1, TEST, OBS_CT, BETA, SE, T_STAT, P, ERRCODE)
+
+# Save ssInput file with selected columns
+readr::write_tsv(ss %>% rename("#CHROM"=CHR), paste0(ss_path, ".gwas"))
 
 # File storage
 plot_dir <- paste0(dirname(ss_path), "/gwas_plots")
@@ -58,7 +64,7 @@ system(paste0("mkdir -p ", plot_dir))
 
 ### Create Manhattan Plot
 
-pdf(paste0(plot_dir, "/", pheno, ".",tag, "_manhattan.pdf"), height = 5, width = 9)
+pdf(paste0(plot_dir, "/", pheno_tag, "_manhattan.pdf"), height = 5, width = 9)
 qqman::manhattan(x=ss %>% filter(P<0.05), chr="CHR", bp="POS", p="P", snp="ID")
 dev.off()
 
@@ -66,7 +72,7 @@ dev.off()
 ### Create Q-Q plot
 
 write(calc_lambda(ss$P), paste0(plot_dir, "/", pheno, "_lambda"))
-pdf(paste0(plot_dir, "/", pheno, ".", tag, "_qq.pdf"))
+pdf(paste0(plot_dir, "/", pheno_tag, "_qq.pdf"))
 make_qq(ss, "P")
 dev.off()
 

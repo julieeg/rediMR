@@ -1,6 +1,5 @@
-# ReDiMR - v1
-# Last updated: May 15, 2023
-
+# ReDiMR
+# Last updated: May 17, 2023
 
 
 ############
@@ -11,42 +10,43 @@
 library(tidyverse) ; library(data.table) ; library(dplyr) ; library(parallel)
 library(paletteer) ; library(RColorBrewer)
 
+
 # command args
 args <- commandArgs(trailingOnly = TRUE)
 pheno <- args[1]
 tag <- args[2]
+pheno_tag <- paste0(pheno, "_", tag)
 
-pheno.tag <- paste0(pheno, ".", tag)
-ssInput <- paste0("../data/processed/rediMR/", pheno, "/", pheno.tag, "_ssInput.csv")  #args[2]
-datInput <- paste0("../data/processed/rediMR/", pheno, "/", pheno.tag, "_datInput.rda") #args[3]
+ssInput <- args[3] #paste0("../data/processed/rediMR/", pheno_tag, "_ssInput.csv")  
+datInput <- args[4] #paste0("../data/processed/rediMR/", pheno_tag, "_datInput.rda") 
+pctBthold <- args[5] #20 
 outDir <- dirname(datInput) #args[4]
-pctBdeltIncl <- 20 #args[5]
 
 
 # load basic functions
 source("../scripts/basic_functions.R")
 
+
 # create directory to store results
 system(paste0("mkdir -p ", outDir))
 
+cat(paste0("Writing results to folder ", outDir))
 
 
-## default ReDiMR variable assignments // optional arguments ?
+
+########################
+## Default parameters ##
+########################
 
 # covariates in base gwas
 gwasCovars <- c("age","sex", paste0("gPC", 1:10))
+
 
 # covariates to adjust for in ReDiMR
 adjCovars <- c("smoke_level.lab", "alch_freq.lab", "pa_met_excess_level.lab", 
                "income_level.lab", "educ_level.lab", "bmi", "waist2hip", paste0("dietPC", 1:10))
 
-
-
-######################################
-## Format covariates for adjustment ##
-######################################
-
-# Assign covar names
+## Format covariates for adjustment 
 adjCovarNames <- c(
     smoke_level.lab="Smoking", alch_freq.lab="Alcohol", 
     pa_met_excess_level.lab="Physical Activity", income_level.lab = "Income", 
@@ -135,7 +135,7 @@ cat(paste0("Writing file with descriptive characteristics by ", pheno, " quantil
 print(dat %>% group_by(phenoQ) %>% select(phenoQ, pheno=all_of(pheno)) %>% summarise(m_SD=mean_sd(pheno, d=3)))
 
 # Write descriptives to csv
-fwrite(tab_descrByPhenoQ, file = paste0(outDir, "/", pheno, "_descrByPhenoQs.csv"))
+fwrite(tab_descrByPhenoQ, file = paste0(outDir, "/", pheno_tag, "_descrByPhenoQs.csv"))
 
 
 
@@ -149,13 +149,13 @@ cat("Calculating pctBchange when adjusting for ALL covariates ... ")
 tab_pctBchangeAllCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) {
   pctBchange.fun(pheno=pheno, snp=snp, adjCovar=paste0(adjCovars, collapse="+"), 
                  replace_covar_name = "All_Covariates", data=dat)}, mc.cores = 8 )) %>% 
-  mutate(RefinedSet = ifelse(abs(B_pctChange) < pctBdeltIncl,1,0)) 
+  mutate(RefinedSet = ifelse(abs(B_pctChange) < pctBthold,1,0)) 
 
 
 # Write results to csv
-fwrite(tab_pctBchangeAllCov, file = paste0(outDir, "/", pheno.tag, "_pctBchangeAllCov.csv"))
+fwrite(tab_pctBchangeAllCov, file = paste0(outDir, "/", pheno_tag, "_pctBchangeAllCov.csv"))
 
-cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno.tag, "_pctBchangeAllCov.csv")))
+cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno_tag, "_pctBchangeAllCov.csv")))
 head(tab_pctBchangeAllCov)
 
 
@@ -174,9 +174,9 @@ tab_pctBchangeByCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) {
 
 
 # Write results to csv
-fwrite(tab_pctBchangeByCov, file = paste0(outDir, "/", pheno.tag, "_pctBchangeByCov.csv"))
+fwrite(tab_pctBchangeByCov, file = paste0(outDir, "/", pheno_tag, "_pctBchangeByCov.csv"))
 
-cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno.tag, "_pctBchangeByCov.csv")))
+cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno_tag, "_pctBchangeByCov.csv")))
 head(tab_pctBchangeByCov)
 
 
@@ -216,7 +216,7 @@ dotAll <- tab_pctBchangeAllCov %>%
                      name = "Refined Set", labels=c("Excluded", "Included")) +
   #scale_y_discrete(labels=rev(plot_B_pct_change_full_model_dat$snp)) +
   xlab(" % |Beta| change from Base model") + ylab(" ") +
-  ggtitle(paste0("Refined set of loci for ", pheno, "\n<", pctBdeltIncl, "% change in B"))
+  ggtitle(paste0("Refined set of loci for ", pheno, "\n<", pctBthold, "% change in B"))
 
 
 # Dot plot of pctBchange when adjusting for EACH covariate
@@ -244,25 +244,16 @@ dotCov <- tab_pctBchangeByCov %>%
 
 
 # Save plots as PDF
-pdf(paste0(outDir, "/", pheno.tag, "_plotBpctAllCov.pdf"), height = 5.5, width = 6)
+pdf(paste0(outDir, "/", pheno_tag, "_plotBpctAllCov.pdf"), height = 5.5, width = 6)
 dotAll
 dev.off()
 
-pdf(paste0(outDir, "/", pheno.tag, "_plotBpctByCov.pdf"), height = 4.5, width = 6)
+pdf(paste0(outDir, "/", pheno_tag, "_plotBpctByCov.pdf"), height = 4.5, width = 6)
 dotCov
 dev.off()
 
-cat(paste0("Done making plots written to ", outDir, "/", pheno.tag, "_plotOutputs.pdf"))
-
-cat("
-Congratulatulations!! You completed ReDiMR Step 1 (SNP Refinement).
-
-    --> You are now ready to proceed to ReDiMR Step 2-Mendelian Randomization. Good luck!")
-
+cat(paste0("Done making plots written to ", outDir, "/", pheno_tag, "_plotOutputs.pdf"))
 
 
 ## EOF - TEMPORARY
-
-#*add quadrant plot??
-#*
 

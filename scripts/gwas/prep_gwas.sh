@@ -27,12 +27,12 @@ reuse -q Anaconda3
 source activate ../opt/bgen
 
 
-
+# Prepare phenotype file for gwas (#FID IID; as tsv)
 R --no-save <<EOF
-library(tidyverse) ; library(data.table) 
-vars_to_select<-c("${pheno}", strsplit("${covars}", " ")[[1]]) 
-fread("../data/processed/ukb_phenos_unrelated_EUR.csv", header=T) %>% select(FID=id, IID=id, all_of(vars_to_select)) %>% rename('#FID'=FID) %>% 
-write.table("../data/processed/gwas/ukb_phenos_${pheno}_gwas.txt", col.names=T, row.names=F, quote=F)
+library(dplyr) ; library(data.table) 
+fread("../data/processed/ukb_phenos_unrelated_EUR.csv", header=T) %>% mutate(FID=id, IID=id, .before=id) %>% \
+mutate(across(colnames(.), function(x) gsub(" ", "_", x))) %>% rename('#FID'=FID) %>% \
+write.table("../data/processed/gwas/ukb_phenos_unrelated_EUR_gwas.txt", col.names=T, row.names=F, quote=F)
 EOF
 
 

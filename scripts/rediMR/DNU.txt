@@ -45,7 +45,7 @@ scratch=/broad/hptmp/gervis
 #################################################
 
 
-awk -v p=$P '{ if($12 < p) {print $3} }' ${ssFile} > ${outDir}/${pheno_tag}.gwas.snps
+awk -v p=$P '{ if($15 < p) {print $3} }' ${ssFile} > ${outDir}/${pheno_tag}.gwas.snps
 
 # build bgen 
 for i in {1..22}; do
@@ -71,12 +71,10 @@ echo Running LD clumping on ${pheno_tag}.gwas.snps and extracting dosage...
 --clump-snp-field "ID" \
 --rm-dup force-first \
 --memory 50000 \
---out ${outDir}/${pheno_tag}_snps \
-mv ${outDir}/${pheno_tag}_snps.clumps ${outDir}/${pheno_tag}_clumps
+--out ${outDir}/${pheno_tag}.gwas.snps
 
-
-awk '{if(NR>1) {print $3} }' ${outDir}/${pheno_tag}_clumps > ${outDir}/${pheno_tag}_loci
-n=$(wc -l < ${outDir}/${pheno_tag}_loci)
+awk '{if(NR>1) {print $3} }' ${outDir}/${pheno_tag}.gwas.snps.clumps > ${outDir}/${pheno_tag}.gwas.loci
+n=$(wc -l < ${outDir}/${pheno_tag}.gwas.loci)
 
 
 
@@ -86,8 +84,8 @@ echo Gathering dosage data ...
 ## Extract dosage for loci, only
 R --vanilla <<EOF 
 library(tidyverse) ; library(data.table) 
-loci<-c(fread("${outDir}/${pheno_tag}_loci", header=F))[[1]] 
-fread("${outDir}/${pheno_tag}_snps.raw") %>% select(IID, contains(loci)) %>% fwrite("${outDir}/${pheno_tag}_loci.raw") 
+loci<-c(fread("${outDir}/${pheno_tag}.gwas.loci", header=F))[[1]] 
+fread("${outDir}/${pheno_tag}.gwas.snps.raw") %>% select(IID, contains(loci)) %>% fwrite("${outDir}/${pheno_tag}.gwas.loci.raw") 
 EOF
 
 
@@ -104,16 +102,11 @@ echo Formatting summary stats and merging phenotype/dosage files in R.
 
 R --vanilla <<EOF 
 library(tidyverse) ; library(data.table) 
-
-# Format summary stats file: writing ${datOutput}/${pheno_tag}_ssInput 
-g<-fread("${outDir}/${pheno_tag}_loci.raw") 
-
+g<-fread("${outDir}/${pheno_tag}.gwas.loci.raw") 
 fread("${ssFile}") %>% rename(CHR="#CHROM", SNP=ID, N=OBS_CT) %>% \
  mutate(EA=ifelse(A1==REF, REF, ALT), NEA=ifelse(A1==REF, ALT, REF), LOCI=ifelse(SNP %in% gsub("_[^_]*$", "", names(g)), 1, 0)) %>% \
  select(CHR, POS, SNP, EA, NEA, BETA, SE, P, N, LOCI) %>% \
  filter(P < 5e-8 & LOCI == 1) %>% fwrite("${outDir}/${pheno_tag}_ssInput.tmp.csv", row.names=F) 
-
-# Merge phenotypes/dosage files: writing {outDir}/${pheno_tag}_datInput 
 left_join(readRDS("${phenoFile}"), g %>% rename(id=IID) %>% mutate(id=as.character(id)), by = "id") %>% filter(ancestry == "${ANC}") %>% \
 saveRDS("${outDir}/${pheno_tag}_datInput.tmp.rda") 
 EOF
@@ -121,7 +114,10 @@ EOF
 
 
 # Format datInput.rda file
-Rscript ../scripts/rediMR/prep_datInput.R ${pheno} ${tag} 
+Rscript ../scripts/rediMR/prep_datInput.R $pheno $tag \
+&& rm ${outDir}/${pheno_tag}_datInput.tmp.rda \
+&& rm ${outDir}/${pheno_tag}_ssInput.tmp.csv
+
 
 
 ############################
@@ -131,31 +127,11 @@ Rscript ../scripts/rediMR/prep_datInput.R ${pheno} ${tag}
 ssInput=${outDir}/${pheno_tag}_ssInput.csv 
 datInput=${outDir}/${pheno_tag}_datInput.rda 
 outDir=${outDir} 
-pctBthhold=20 
+pctBchange=20 
 
 
-Rscript ../scripts/rediMR/rediMR.R $pheno $tag $ssInput $datInput $pctBthhold $outDir \
-&& echo Congratulatulations!! You completed ReDiMR Step 1 (SNP Refinement).
+Rscript ../scripts/rediMR/rediMR.R $pheno $tag $ssInput $datInput $pctBthhold $outDir
 
-
-
-########################
-## Delete breadcrumbs ##
-########################
-
-echo Deleting the following breadcrumb files from ${outDir}: \
-${pheno_tag}_datInput.tmp.rda ${pheno_tag}_ssInput.tmp.csv ${pheno_tag}_loci ${pheno_tag}_loci.raw
-
-rm ${outDir}/${pheno_tag}_snps.raw
-rm ${outDir}/${pheno_tag}_loci 
-rm ${outDir}/${pheno_tag}_loci.raw 
-
-rm ${outDir}/${pheno_tag}_datInput.tmp.rda 
-rm ${outDir}/${pheno_tag}_ssInput.tmp.csv 
-
-
-echo --> You are now ready to proceed to ReDiMR Step 2-Mendelian Randomization. \
-Good luck!
 
 
 

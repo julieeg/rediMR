@@ -13,11 +13,11 @@ CHR=$SGE_TASK_ID
 
 
 pheno=$1
-phenoFile=../data/processed/gwas/ukb_phenos_raw_veg_gwas.txt
+phenoFile=../data/processed/gwas/ukb_phenos_unrelated_EUR_gwas.txt
 covars="age sex gPC1 gPC2 gPC3 gPC4 gPC5 gPC6 gPC7 gPC8 gPC9 gPC10"
 
 tag=$2
-
+pheno_tag=${pheno}_${tag}
 
 
 source /broad/software/scripts/useuse
@@ -44,10 +44,9 @@ scratch=/broad/hptmp/gervis
 	--mind 0.2 \
 	--memory 50000 \
 	--threads 8 \
-	--out ${scratch}/${pheno}_chr${CHR}.${tag} \
-&& mv ${scratch}/${pheno}_chr${CHR}.${tag}.${pheno}.glm.linear ../data/processed/gwas/${pheno}_chr${CHR}.${tag}.gwas \
-&& mv ${scratch}/${pheno}_chr${CHR}.${tag}.log ../data/processed/gwas/${pheno}_chr${CHR}.${tag}.log 
-
+	--out ${scratch}/${pheno_tag}_chr${CHR} \
+&& mv ${scratch}/${pheno_tag}_chr${CHR}.${pheno}.glm.linear ../data/processed/gwas/${pheno_tag}_chr${CHR}.gwas \
+&& mv ${scratch}/${pheno_tag}_chr${CHR}.log ../data/processed/gwas/${pheno_tag}_chr${CHR}.log 
 
 
 
