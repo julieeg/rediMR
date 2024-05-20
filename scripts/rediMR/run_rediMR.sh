@@ -45,14 +45,14 @@ scratch=/broad/hptmp/gervis
 #################################################
 
 
-awk -v p=$P '{ if($12 < p) {print $3} }' ${ssFile} > ${outDir}/${pheno_tag}.gwas.snps
+awk -v p=$P '{ if($12 < p) {print $3} }' ${ssFile} > ${outDir}/${pheno_tag}_snps
 
 # build bgen 
 for i in {1..22}; do
 	echo Builing bgen for chr ${i} ...
-	bgenix -g ${genoDir}/ukb_imp_chr${i}_v3.bgen -incl-rsids ${outDir}/${pheno_tag}.gwas.snps > ${scratch}/${pheno_tag}_chr${i}.gwas.snps.bgen
-	done ; cat-bgen -g ${scratch}/${pheno_tag}_chr*.gwas.snps.bgen -og ${scratch}/${pheno_tag}.gwas.snps.bgen -clobber \
-&& rm ${scratch}/${pheno_tag}_chr*.gwas.snps.bgen
+	bgenix -g ${genoDir}/ukb_imp_chr${i}_v3.bgen -incl-rsids ${outDir}/${pheno_tag}_snps > ${scratch}/${pheno_tag}_chr${i}_snps.bgen
+	done ; cat-bgen -g ${scratch}/${pheno_tag}_chr*_snps.bgen -og ${scratch}/${pheno_tag}_snps.bgen -clobber \
+&& rm ${scratch}/${pheno_tag}_chr*_snps.bgen
 
 
 
@@ -72,7 +72,8 @@ echo Running LD clumping on ${pheno_tag}.gwas.snps and extracting dosage...
 --rm-dup force-first \
 --memory 50000 \
 --out ${outDir}/${pheno_tag}_snps \
-mv ${outDir}/${pheno_tag}_snps.clumps ${outDir}/${pheno_tag}_clumps
+mv ${outDir}/${pheno_tag}_snps.clumps ${outDir}/${pheno_tag}_clumps \
+&& rm ${scratch}/${pheno_tag}_snps.bgen 
 
 
 awk '{if(NR>1) {print $3} }' ${outDir}/${pheno_tag}_clumps > ${outDir}/${pheno_tag}_loci
@@ -134,8 +135,7 @@ outDir=${outDir}
 pctBthhold=20 
 
 
-Rscript ../scripts/rediMR/rediMR.R $pheno $tag $ssInput $datInput $pctBthhold $outDir \
-&& echo Congratulatulations!! You completed ReDiMR Step 1 (SNP Refinement).
+Rscript ../scripts/rediMR/rediMR.R $pheno $tag $ssInput $datInput $pctBthhold $outDir
 
 
 

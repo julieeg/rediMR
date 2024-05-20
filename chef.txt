@@ -16,10 +16,14 @@ qsub -t 1-22 ../scripts/gwas/prep_gwas.sh
 for FOOD in raw_veg cooked_veg fresh_fruit dried_fruit ; do qsub -t 1-22 ../scripts/gwas/run_gwas.sh ${FOOD} tag; done
 for FOOD in raw_veg cooked_veg fresh_fruit dried_fruit ; do qsub ../scripts/gwas/postprocess_gwas.sh ${FOOD} tag ; done
 
+for FOOD in procmeat coffee ; do qsub -t 1-22 ../scripts/gwas/run_gwas.sh ${FOOD} tag; done
+for FOOD in procmeat coffee ; do qsub ../scripts/gwas/postprocess_gwas.sh ${FOOD} tag ; done
 
-## Run_ReDiMR.sh (loci, raw genotype files, formatted phenotype file [with pheno + covars])
+
+## Run rediMR to generate adjusted Bs, %change and basic rediMR plots
 for FOOD in raw_veg cooked_veg fresh_fruit dried_fruit ; do qsub ../scripts/rediMR/run_rediMR.sh ${FOOD} tag; done 
 
+for FOOD in procmeat coffee ; do qsub ../scripts/rediMR/run_rediMR.sh ${FOOD} tag; done 
 
 ## Run series of MR for [outcome traits]
 for FOOD in raw_veg cooked_veg fresh_fruit; do 

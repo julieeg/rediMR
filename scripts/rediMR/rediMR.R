@@ -153,7 +153,7 @@ tab_pctBchangeAllCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) {
 
 
 # Write results to csv
-fwrite(tab_pctBchangeAllCov, file = paste0(outDir, "/", pheno_tag, "_pctBchangeAllCov.csv"))
+write.csv(tab_pctBchangeAllCov, file = paste0(outDir, "/", pheno_tag, "_pctBchangeAllCov.csv"), row.names=T)
 
 cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno_tag, "_pctBchangeAllCov.csv")))
 head(tab_pctBchangeAllCov)
@@ -254,6 +254,8 @@ dev.off()
 
 cat(paste0("Done making plots written to ", outDir, "/", pheno_tag, "_plotOutputs.pdf"))
 
+cat(paste0(" Congratulatulations!! You completed ReDiMR Step 1 (SNP Refinement) ",
+    "for ", pheno, "."))
 
-## EOF - TEMPORARY
+## EOF
 

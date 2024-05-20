@@ -106,10 +106,10 @@ cat(paste0("Creating a categorical variable for ", pheno, "... \n"))
 # Determine quantiles
 pheno4Qs <- quantile(dat.merged %>% select(all_of(pheno)), probs=seq(0,1,0.25), na.rm=T) ; pheno4Qs
 pheno3Qs <- quantile(dat.merged %>% select(all_of(pheno)), probs=seq(0,1,0.33), na.rm=T) ; pheno3Qs
-if(length(unique(pheno4Qs)) == 4) {
+if(length(unique(pheno4Qs)) == 5) {
   cat(paste0("Quartiles for ", pheno, " are unique. --> Defining categories by QUARTILE, as follows: \n")) 
   phenoQs <- pheno4Qs ; print(phenoQs)
-} else if(length(unique(pheno3Qs)) == 3) {
+} else if(length(unique(pheno3Qs)) == 4) {
   cat(paste0("Quartiles for ", pheno, " are not unique. --> Defining categories by TERTILE, as follows: \n.")) 
   phenoQs <- pheno3Qs ; print(phenoQs)
 } else {

@@ -33,6 +33,8 @@ done
 
 head ${ss_prefix}.gwas
 
+
+
 # Make gwas plots
 Rscript ../scripts/gwas/postprocess_gwas.R ${pheno} ${tag}
 
