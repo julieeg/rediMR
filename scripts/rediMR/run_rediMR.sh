@@ -20,7 +20,7 @@ phenoFile=../data/processed/ukb_phenos_unrelated.rda
 
 ## Parameters
 P=5e-8
-pDelta=20
+pctBthhold=20
 ANC=EUR
 
 outDir=../data/processed/rediMR
@@ -44,7 +44,6 @@ scratch=/broad/hptmp/gervis
 ## Run LD clumping to extract significant loci ##
 #################################################
 
-
 awk -v p=$P '{ if($12 < p) {print $3} }' ${ssFile} > ${outDir}/${pheno_tag}_snps
 
 # build bgen 
@@ -56,13 +55,14 @@ for i in {1..22}; do
 
 
 
-echo Running LD clumping on ${pheno_tag}.gwas.snps and extracting dosage...
+echo Running LD clumping on ${pheno_tag}_snps and extracting dosage...
 
 ## run LD clumping in plink
 ../opt/plink2 \
---bgen ${scratch}/${pheno_tag}.gwas.snps.bgen ref-first \
+--bgen ${scratch}/${pheno_tag}_snps.bgen ref-first \
 --sample /humgen/florezlab/UKBB_app27892/ukb27892_imp_chrAUT_v3_s487395.sample \
 --export A \
+--freq \
 --clump ${ssFile} \
 --clump-p1 5e-8 \
 --clump-r2 0.01 \
@@ -72,7 +72,7 @@ echo Running LD clumping on ${pheno_tag}.gwas.snps and extracting dosage...
 --rm-dup force-first \
 --memory 50000 \
 --out ${outDir}/${pheno_tag}_snps \
-mv ${outDir}/${pheno_tag}_snps.clumps ${outDir}/${pheno_tag}_clumps \
+&& mv ${outDir}/${pheno_tag}_snps.clumps ${outDir}/${pheno_tag}_clumps \
 && rm ${scratch}/${pheno_tag}_snps.bgen 
 
 
@@ -84,11 +84,12 @@ n=$(wc -l < ${outDir}/${pheno_tag}_loci)
 echo Gathering dosage data ...
 
 
-## Extract dosage for loci, only
+## Extract dosage & afreq for loci, only
 R --vanilla <<EOF 
 library(tidyverse) ; library(data.table) 
 loci<-c(fread("${outDir}/${pheno_tag}_loci", header=F))[[1]] 
 fread("${outDir}/${pheno_tag}_snps.raw") %>% select(IID, contains(loci)) %>% fwrite("${outDir}/${pheno_tag}_loci.raw") 
+fread("${outDir}/${pheno_tag}_snps.afreq") %>% filter(ID %in% loci) %>% fwrite("${outDir}/${pheno_tag}_loci.afreq") 
 EOF
 
 
@@ -139,16 +140,14 @@ Rscript ../scripts/rediMR/rediMR.R $pheno $tag $ssInput $datInput $pctBthhold $o
 
 
 
-########################
-## Delete breadcrumbs ##
-########################
+####################################
+## Delete breadcrumbs from Step 1 ##
+####################################
 
 echo Deleting the following breadcrumb files from ${outDir}: \
 ${pheno_tag}_datInput.tmp.rda ${pheno_tag}_ssInput.tmp.csv ${pheno_tag}_loci ${pheno_tag}_loci.raw
 
-rm ${outDir}/${pheno_tag}_snps.raw
-rm ${outDir}/${pheno_tag}_loci 
-rm ${outDir}/${pheno_tag}_loci.raw 
+rm ${outDir}/${pheno_tag}_*.raw
 
 rm ${outDir}/${pheno_tag}_datInput.tmp.rda 
 rm ${outDir}/${pheno_tag}_ssInput.tmp.csv 
@@ -158,10 +157,5 @@ echo --> You are now ready to proceed to ReDiMR Step 2-Mendelian Randomization. 
 Good luck!
 
 
-
 ##EOF
-
-
-
-
 

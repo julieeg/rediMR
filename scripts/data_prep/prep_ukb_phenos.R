@@ -349,7 +349,7 @@ check_num_valid_24hr <- function(df) {
 
 
 # nutrient variables
-diet_vars <- c("TCALS_raw", "TCALS", "CHO", "FAT",  "MUFA", "SFA", "PUFA", "PRO", 
+diet_vars <- c("TCALS", "CHO", "FAT",  "MUFA", "SFA", "PUFA", "PRO", 
                "ALC", "FIBER",  "CHO2FIB", "CHO2FIB_log", "FIB2CHO", "FIB2CHO_sqrt")
 
 ## merge "Typical diet yesterday" with nutrient intake vars 
@@ -360,20 +360,19 @@ diet_id <- left_join(fread("/humgen/florezlab/UKBB_app27892/UKBB_app27892_downlo
                         select(f.eid, starts_with("f.100020")),
                       by = "f.eid") %>%
   
-  mutate(TCALS_raw = fetch_diet_fields("26002", .),
-         CHO = fetch_diet_fields("26013", .),
+  mutate(CHO = fetch_diet_fields("26013", .),
          SFA = fetch_diet_fields("26014", .),
          MUFA = fetch_diet_fields("26032", .),
          PUFA_N3 = fetch_diet_fields("26015", .),
          PUFA_N6 = fetch_diet_fields("26016", .),
          PRO = fetch_diet_fields("26005", .),
+         FAT = fetch_diet_fields("26008", .),
          ALC = fetch_diet_fields("26030", .),
          FIBER = fetch_diet_fields("26017", .),
          num_recalls = check_num_valid_24hr(.),
          ) %>%
   
-  mutate(TCALS_raw = TCALS_raw / 4.18,  # Energy from kJ to kcal, likely includes alcohol
-         PUFA = PUFA_N3+PUFA_N6,
+  mutate(PUFA = PUFA_N3+PUFA_N6,
          
          #diet quality measures: CHO / FIBER ratios
          CHO2FIB = ifelse(FIBER >0, CHO / FIBER, NA),
@@ -434,7 +433,7 @@ neg_to_num <- function(x) {
 
 
 # compile ffq variables & add total variables    
-ffq_id <- base_phenos %>% select(id=f.eid, ffq_vars) %>%
+ffq_id <- base_phenos %>% select(id=f.eid, all_of(ffq_vars)) %>%
   mutate(whole_bread = case_when(
     bread_type == 3 ~ 1,
     bread_type %in% c(1, 2, 4) ~ 0,
@@ -532,8 +531,8 @@ diet_all_id <- diet_id %>%
   left_join(., ffq_id, by = "id") %>%
   
   ## Replace values >5SD with NA********************
-  mutate_at(vars(all_of(diet_vars)), ~function(x) remove_outliers.fun(x, SDs=5)) %>%
-  mutate_at(vars(all_of(ffq_fields)), ~function(x) remove_outliers.fun(x, SDs=5))
+  mutate(across(c(diet_vars), ~remove_outliers.fun(., SDs=5))) %>%
+  mutate(across(c(names(ffq_fields)), ~remove_outliers.fun(., SDs=5)))
 
 
 print(paste0("Dietary data from UKB FFQs prepared for N = ", nrow(diet_all_id), " participants"))
@@ -558,14 +557,6 @@ anc_rel_id <- fread("/humgen/florezlab/UKBB_app27892/ukbreturn2442/all_pops_non_
 
 print("Breakdown of available data by relatedness & ancestry from PanUKBB: ")
 print(table(anc_rel_id$unrelated, anc_rel_id$ancestry))
-
-
-
-######################################
-## Replace diet values >5SD with NA ##
-#####################################
-
-
 
 
 
@@ -604,27 +595,27 @@ phenos %>%
 # unrelated & by Ancestry
 phenos %>%
   filter(unrelated == TRUE & ancestry == "EUR") %>%
-  write.table("../data/processed/ukb_phenos_unrelated_EUR.txt")
+  write.table("../data/processed/ukb_phenos_unrelated_EUR.csv")
 
 phenos %>%
   filter(unrelated == TRUE & ancestry == "AFR") %>%
-  write.table("../data/processed/ukb_phenos_unrelated_AFR.txt")
+  write.table("../data/processed/ukb_phenos_unrelated_AFR.csv")
 
 phenos %>%
   filter(unrelated == TRUE & ancestry == "AMR") %>%
-  write.table("../data/processed/ukb_phenos_unrelated_AMR.txt")
+  write.table("../data/processed/ukb_phenos_unrelated_AMR.csv")
 
 phenos %>%
   filter(unrelated == TRUE & ancestry == "CSA") %>%
-  write.table("../data/processed/ukb_phenos_unrelated_CSA.txt")
+  write.table("../data/processed/ukb_phenos_unrelated_CSA.csv")
 
 phenos %>%
   filter(unrelated == TRUE & ancestry == "EAS") %>%
-  write.table("../data/processed/ukb_phenos_unrelated_EAS.txt")
+  write.table("../data/processed/ukb_phenos_unrelated_EAS.csv")
 
 phenos %>%
   filter(unrelated == TRUE & ancestry == "MID") %>%
-  write.table("../data/processed/ukb_phenos_unrelated_MID.txt")
+  write.table("../data/processed/ukb_phenos_unrelated_MID.csv")
 
 
 print("Done preparing UKB Phenotype data. Datasets are ready for analysis.")

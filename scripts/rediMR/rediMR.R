@@ -2,14 +2,20 @@
 # Last updated: May 17, 2023
 
 
-############
-## Set Up ##
-############
+
+
+###########################################
+##  STEP 1: Set up & assign parameters  ##
+##########################################
+
+# =======================
+##  Set up
+# =======================
 
 # load required packages
-library(tidyverse) ; library(data.table) ; library(dplyr) ; library(parallel)
-library(paletteer) ; library(RColorBrewer)
-
+lapply(c("tidyverse", "data.table", "parallel", "paletteer", "RColorBrewer",
+         "ggpubr", "R3port", "tinytex"),  
+       library, character.only = TRUE)
 
 # command args
 args <- commandArgs(trailingOnly = TRUE)
@@ -17,26 +23,19 @@ pheno <- args[1]
 tag <- args[2]
 pheno_tag <- paste0(pheno, "_", tag)
 
-ssInput <- args[3] #paste0("../data/processed/rediMR/", pheno_tag, "_ssInput.csv")  
+ssInput <- args[3] #paste0("../data/processed/rediMR/", pheno_tag, "_ssInput.csv")
 datInput <- args[4] #paste0("../data/processed/rediMR/", pheno_tag, "_datInput.rda") 
 pctBthold <- args[5] #20 
-outDir <- dirname(datInput) #args[4]
+outDir <- args[6] #dirname(datInput)
 
 
 # load basic functions
 source("../scripts/basic_functions.R")
 
 
-# create directory to store results
-system(paste0("mkdir -p ", outDir))
-
-cat(paste0("Writing results to folder ", outDir))
-
-
-
-########################
-## Default parameters ##
-########################
+# =======================
+##  Assign parameters
+# =======================
 
 # covariates in base gwas
 gwasCovars <- c("age","sex", paste0("gPC", 1:10))
@@ -65,10 +64,35 @@ adjCovarNames.l <- as.list(adjCovarNames)
 nCovars.l <- as.list(1:length(adjCovarNames.l))
 
 
+## Inputs & parameters
+cat("\n ReDiMR Inputs: \n -ssInput ", ssInput, "\n -datInput ", datInput, "\n -pctBthold ", pctBthold, "\n -outDir ", outDir, "\n")
 
-############################################################
-## Build function to calculate pctBchange from Base Model ##
-############################################################
+cat("\n Covariates for adjustment: \n", paste0(" - ", t(list2DF(adjCovarNames.l)), "\n"))
+
+
+
+
+#################################################################
+##  Load input files ; Write functions to calculate %B change  ##
+#################################################################
+
+# ==========================================
+## Load data input files
+# ==========================================
+
+# Load summary stats data
+ss<-fread(ssInput) %>% filter(LOCI == 1)
+
+# Load phenotype/dosage data
+dat<-readRDS(datInput)
+
+# list of snps
+snps <- names(dat %>% select(contains(ss$SNP)))
+
+
+# =============================================
+## Write functions to calculate %B change 
+# =============================================
 
 pctBchange.fun <- function(pheno, snp, adjCovar, baseCovars=gwasCovars, replace_covar_name=NA, data=dat) {
   
@@ -86,7 +110,7 @@ pctBchange.fun <- function(pheno, snp, adjCovar, baseCovars=gwasCovars, replace_
 
   if(!is.na(replace_covar_name)) {covarName = replace_covar_name} else {covarName = adjCovar}
   lmOut <- cbind.data.frame(
-    snp=paste(snp), covar=covarName, B_base=baseM$coef[2], B_adj=adjM$coef[2], 
+    snp=snp_EA, covar=covarName, B_base=baseM$coef[2], B_adj=adjM$coef[2], 
     lowCI_base=baseCI[1], upCI_base=baseCI[2], lowCI_adj=adjCI[1], upCI_adj=adjCI[2], 
     P_base=baseP, P_adj=adjP, B_pctChange=pctB) ; rownames(lmOut) <- paste0(covarName)
   
@@ -95,167 +119,130 @@ pctBchange.fun <- function(pheno, snp, adjCovar, baseCovars=gwasCovars, replace_
 
 
 
-###############################################
-## Load input files & Run basic descriptives ##
-###############################################
 
-# Load summary stats data
-ss<-fread(ssInput) %>% filter(LOCI == 1)
+########################################################################
+## Basic descriptives of FOOD & covariates for adjustment
+########################################################################
 
-# Load phenotype/dosage data
-dat<-readRDS(datInput)
+print_summary_table <- function(pheno) {
+  do.call(rbind.data.frame, lapply(1:length(adjCovarNames), function(i) {
+    covar=adjCovarNames[i]
+    tmp <- dat %>% select(Covariate=all_of(names(covar)), y=all_of(pheno)) %>% filter(!is.na(y)) 
+    if(is.factor(tmp$Covariate)) {
+      out <- tmp %>% group_by(Covariate) %>% 
+        summarise(Mean.SD = mean_sd(y)) %>% mutate(Variable.Name=covar,.before=Covariate) %>% 
+        as.data.frame() } 
+    else if(is.numeric(tmp$Covariate)) {
+      out <- tmp %>% mutate(Covariate=ifelse(Covariate<median(Covariate, na.rm=T), "Above median", "Below median")) %>%
+        group_by(Covariate) %>% summarise(Mean.SD=mean_sd(y)) %>% 
+        mutate(Variable.Name=covar, .before=Covariate) %>% as.data.frame() }
+  } ))
+}
 
-# list of snps
-snps <- names(dat %>% select(contains(ss$SNP)))
-
-
-
-#######################################
-## Basic descriptives by pheno_quant ##
-#######################################
-
-tab_descrByPhenoQ <- do.call(rbind.data.frame, lapply(nCovars.l, function(i) {
-  tmp <- dat %>% select(phenoQ, cov=all_of(names(adjCovarNames)[i])) %>%
-    filter(!is.na(phenoQ)) %>% group_by(phenoQ)
-  if(is.factor(tmp$cov)) {
-    out <- do.call(rbind.data.frame, lapply(levels(tmp$cov), function(lvl) {
-      tmp %>% summarise(cov_level = n_pct(cov, level = lvl)) %>% 
-        t() %>% as.data.frame() %>% filter(V1 != "Q1") } ))
-    rownames(out) <- paste0( adjCovarNames[i], "_", levels(tmp$cov), ", n (%)") } 
-  else if(is.numeric(tmp$cov)) {
-    out <- tmp %>% summarise(cov_msd = mean_sd(cov)) %>%
-      t() %>% as.data.frame() %>% filter(V1 != "Q1")
-    rownames(out) <- paste0(adjCovarNames[i], ", mean \u00B1 SD") }
-  colnames(out) <- c(paste0("Q", 1:ncol(out)))
-  out
-} )) ; head(tab_descrByPhenoQ)
-
-
-cat(paste0("Writing file with descriptive characteristics by ", pheno, " quantiles: \n"))
-print(dat %>% group_by(phenoQ) %>% select(phenoQ, pheno=all_of(pheno)) %>% summarise(m_SD=mean_sd(pheno, d=3)))
-
-# Write descriptives to csv
-fwrite(tab_descrByPhenoQ, file = paste0(outDir, "/", pheno_tag, "_descrByPhenoQs.csv"))
+print_summary_table("raw_veg") %>% write.csv(file = paste0(outDir, "/", pheno_tag, "_tabDescrByCov.csv"), row.names=T)
 
 
 
-############################################################
-## Calculate pct % beta for ALL covariates --> Refinement ##
-############################################################
 
-cat("Calculating pctBchange when adjusting for ALL covariates ... ")
+########################################################################
+## Run rediMR to calculate pct Beta change after covariate adjustment ## 
+########################################################################
+
+# ================================================
+## Adjust for ALL covariates --> SNP Refinement  
+# ================================================
+
+cat("\n Calculating pctBchange when adjusting for ALL covariates ... \n ")
 
 # For eacn SNP, tabulate pctBchange when adjusting for ALL covariates
-tab_pctBchangeAllCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) {
+tabBchangeAllCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) {
   pctBchange.fun(pheno=pheno, snp=snp, adjCovar=paste0(adjCovars, collapse="+"), 
                  replace_covar_name = "All_Covariates", data=dat)}, mc.cores = 8 )) %>% 
-  mutate(RefinedSet = ifelse(abs(B_pctChange) < pctBthold,1,0)) 
+  mutate(RefinedSet = ifelse(abs(B_pctChange) < as.numeric(pctBthold),1,0)) 
 
 
 # Write results to csv
-write.csv(tab_pctBchangeAllCov, file = paste0(outDir, "/", pheno_tag, "_pctBchangeAllCov.csv"), row.names=T)
+write.csv(tabBchangeAllCov, file = paste0(outDir, "/", pheno_tag, "_tabBchangeAllCov.csv"), row.names=T)
 
-cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno_tag, "_pctBchangeAllCov.csv")))
-head(tab_pctBchangeAllCov)
+cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno_tag, "_tabBchangeAllCov.csv")))
+head(tabBchangeAllCov)
 
 
 
-###############################################################
-## Calculate pct % beta BY covariate --> Covariate Influence ##
-###############################################################
+# =======================================================
+## Adjusting for EACH covariate --> Covariate Influence  
+# =======================================================
 
 cat("Calculating pctBchange when adjusting for EACH covariate ... ")
 
 # For each snp, tabulate pctBchange when adjusting for EACH covariate
-tab_pctBchangeByCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) { 
+tabBchangeByCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) { 
   do.call(rbind.data.frame, mclapply(nCovars.l, function(i) {
     pctBchange.fun(pheno=pheno, snp=snp, adjCovar=names(adjCovarNames)[i], 
                    replace_covar_name=adjCovarNames[[i]], data=dat) }, mc.cores = 8))  }, mc.cores = 8))
 
-
 # Write results to csv
-fwrite(tab_pctBchangeByCov, file = paste0(outDir, "/", pheno_tag, "_pctBchangeByCov.csv"))
+fwrite(tabBchangeByCov, file = paste0(outDir, "/", pheno_tag, "_tabBchangeByCov.csv"))
 
-cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno_tag, "_pctBchangeByCov.csv")))
-head(tab_pctBchangeByCov)
-
-
+cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno_tag, "_tabBchangeByCov.csv")))
+head(tabBchangeByCov)
 
 
-###################
-## ReDi MR Plots ##
-###################
-
-cat (paste0("Making ReDiMR plots."))
-
-palettes <- list(NatComms=paletteer_d("ggsci::nrc_npg", n=10))
-
-# set default ggplot theme
-ggthemeF <- theme(panel.grid.minor.y = element_blank(), 
-                  panel.grid.minor.x = element_blank(), 
-                  axis.text = element_text(color="black", hjust=1),
-                  #axis.title = element_text(face = "bold", size=11, vjust=1.5),
-                  #plot.title=element_text(size=12),
-                  #legend.text = element_text(size=10), legend.title = element_text(face="bold", size=10),
-                  legend.position = "right", legend.box.background = element_rect(color = "black"))
-
-
-# Dot plot of pctBchange when adjusting for ALL covariates
-xscale <- ceiling(max(abs(tab_pctBchangeAllCov$B_pctChange))*1.15)
-
-dotAll <- tab_pctBchangeAllCov %>%
-  arrange(B_pctChange) %>%
-  mutate(SNP=factor(snp, levels=snp), RefinedSet=factor(RefinedSet, levels=c("0","1"))) %>%
-  ggplot(aes(x=B_pctChange, y = SNP, color = RefinedSet)) + 
-  theme_bw() + ggthemeF + 
-  scale_x_continuous(limits=c(-xscale, xscale)) +
-  geom_vline(xintercept = 0, color = "black") + 
-  geom_vline(xintercept = c(-20, 20), color = "black", linetype = "dashed") + 
-  geom_point(size=2.5, position = position_jitter(0)) + 
-  scale_color_manual(values = c(palettes$NatComms[1], palettes$NatComms[3]), 
-                     name = "Refined Set", labels=c("Excluded", "Included")) +
-  #scale_y_discrete(labels=rev(plot_B_pct_change_full_model_dat$snp)) +
-  xlab(" % |Beta| change from Base model") + ylab(" ") +
-  ggtitle(paste0("Refined set of loci for ", pheno, "\n<", pctBthold, "% change in B"))
-
-
-# Dot plot of pctBchange when adjusting for EACH covariate
-
-palettes$CovarGroups=c(brewer.pal(9,"Oranges")[4:6], brewer.pal(9, "Greens")[5:4], 
-   brewer.pal(9, "Blues")[5:6],  brewer.pal(9, "Purples")[c(8:4)], brewer.pal(9, "PiYG")[1:3], brewer.pal(9, "PuRd")[5:6])
-
-yscale <- ceiling(max(abs(tab_pctBchangeByCov$B_pctChange))*1.10)
-dotCov <- tab_pctBchangeByCov %>%
-  mutate(covar=factor(covar, levels=adjCovarNames)) %>%
-  arrange(covar) %>%
-  ggplot(aes(x=covar, y = B_pctChange, color = covar)) + 
-  theme_bw() + ggthemeF + 
-  theme(axis.text.x = element_text(angle=35, vjust=0.99, size=10),
-        legend.position = "none") +
-  scale_y_continuous(limits=c(-yscale, yscale)) +
-  geom_hline(yintercept = 0, color = "black") + 
-  geom_hline(yintercept = c(-10, 10), color = "black", linetype = "dashed") + 
-  geom_point(size=1.15, position = position_jitter(0.25)) + 
-  scale_color_manual(values = palettes$CovarGroups, name = "Adjusted\nCovariate") +
-  #scale_y_discrete(labels=rev(plot_B_pct_change_full_model_dat$snp)) +
-  ylab(" % |Beta| change from Base model") + xlab(" ") + 
-  ggtitle(paste0(pheno, " % |Beta| change by SNP and covariate"))
+###############################################################################
+                      ## ~~~ Step 1 Completed !! ~~~~ ##
+cat(paste0("\n Congratulatulations!!\n",
+          " You completed ReDiMR Step 1: SNP Refinement for ", pheno, "!\n"),
+    "Now proceeding to Step 2: Two-Sample MR with", mr_traits, "...")
+###############################################################################
 
 
 
-# Save plots as PDF
-pdf(paste0(outDir, "/", pheno_tag, "_plotBpctAllCov.pdf"), height = 5.5, width = 6)
-dotAll
-dev.off()
 
-pdf(paste0(outDir, "/", pheno_tag, "_plotBpctByCov.pdf"), height = 4.5, width = 6)
-dotCov
-dev.off()
 
-cat(paste0("Done making plots written to ", outDir, "/", pheno_tag, "_plotOutputs.pdf"))
+###########################################
+##  STEP 2: Set up & assign parameters  ##
+##########################################
 
-cat(paste0(" Congratulatulations!! You completed ReDiMR Step 1 (SNP Refinement) ",
-    "for ", pheno, "."))
+install.packages("ieugwasr")
+remotes::install_github("MRCIEU/TwoSampleMR")
+remotes::install_github('MRCIEU/ieugwasr')
+library(TwoSampleMR) ; library(ieugwasr)
 
-## EOF
+
+# establish token for ieugwas access
+opengwas_jwt <- "eyJhbGciOiJSUzI1NiIsImtpZCI6ImFwaS1qd3QiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJhcGkub3Blbmd3YXMuaW8iLCJhdWQiOiJhcGkub3Blbmd3YXMuaW8iLCJzdWIiOiJqdWxpZS5nZXJ2aXNAdHVmdHMuZWR1IiwiaWF0IjoxNzE3MTc5MzkxLCJleHAiOjE3MTgzODg5OTF9.Uu_WDLV7LmYN9ZYoEnVr_pOEUu9ggPHLH3gdUNJ4CcyBSG4VQ2eB-prv8SzaCINn8-pEExBBSnrUx6lHS5324g9qvQWV52cVZuwBEXjlvqxKz99Lq6AIRsUWaTxAZ38JWIiGF6M2bElty9G0NE4WPIWi76OTE9Ad4iv5SQZvFWO-4qwxzxudcWnsNasvd6Y12HSaTnMjDenR2DU8guF_O_bFL3yRxOjCKZT6WKfplmRZXJM8HADamK7h-FUUp7RMavgvLeLWjUhVT1pLVL3BvHSvOiH49lRl9FBG_KAuO6nnewWZCVh2eAof9L2Ud2kec4o_PIF8VsoAl8bwe-aUvA"
+
+
+## Build exposure_dat file for TwoSampleME; using
+# -tabBchangeAllCov for refined/included SNP subsets
+# -loci.afreq for effect allele frequency
+# -ssInput.csv for [unrefined] gwas summary stats
+
+afreq <- fread(paste0("../data/processed/rediMR/", pheno_tag, "_loci.afreq")) %>%
+  mutate(SNP=ifelse(!startsWith(ID, "rs"), gsub(":", ".", paste0("snp", ID)), ID)) %>%
+  mutate(REF_FREQS = 1-ALT_FREQS) %>% 
+  select(SNP, ALT_FREQS, REF_FREQS, REF_FREQ_ALLELE=REF, ALT_FREQ_ALLELE=ALT) 
+
+exposure_dat <- ss %>% left_join(afreq, by = "SNP") %>% 
+  mutate(effect.allele_exposure = ifelse(BETA>0, EA, NEA),
+         other.allele_exposure = ifelse(BETA>0, NEA, EA),
+         beta.exposure=abs(BETA), se.exposure=SE) %>%
+  mutate(eaf.exposure=ifelse(effect.allele_exposure==ALT_FREQ_ALLELE, ALT_FREQS, REF_FREQS)) %>%
+  rowwise() %>% mutate(refined.set = tabBchangeAllCov$RefinedSet[which(startsWith(tabBchangeAllCov$snp, SNP))]) %>%
+  ungroup() %>% select(SNP, beta.exposure, se.exposure, effect.allele_exposure, other.allele_exposure, eaf.exposure, refined.set)
+
+
+
+outcome_test=extract_outcome_data(snps=ss$SNP, outcomes = "ebi-a-GCST90018808", opengwas_jwt = opengwas_jwt)
+
+
+
+
+
+
+
+
+
+
+
 
