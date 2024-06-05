@@ -162,16 +162,48 @@ plot_mr_leaveoneout_bySNPset.fun(outcomes[1])
 ## MR total forest plot
 # ==========================================
 
+plot_mr_forest_bySNPset.fun <- function(outcome) {
+  
+  mr_sum_forest <- do.call(rbind.data.frame, lapply(snpsets, function(set) {
+    mr_summary.l[[outcome]][[set]]$mr_summary %>% 
+      filter(method == "MR Egger" | method == "Inverse variance weighted") } )) %>%
+    mutate(snp_set = factor(snp_set, levels=c("All", "Refined", "Unrefined"))) %>%
+    mutate(method = factor(method, levels=c("MR Egger", "Inverse variance weighted"), labels=c("MR Egger", "IVW"))) %>%
+    mutate(b=ifelse(type=="or",log10(estimate), estimate))
+  
+  labs<-sapply(c("All","Refined","Unrefined"), function(x) paste0(x, " (N=",mr_sum_forest$nsnp[mr_sum_forest$snp_set==x][1],")"))
+  mr_sum_forest %>% 
+    ggplot(aes(x=b, xmin=b-1.96*se, xmax=b+1.96*se, y=method, group=rev(snp_set), color=snp_set, shape=method)) +
+    ggtheme + facet_wrap(~outcome) +
+    geom_vline(xintercept = 0) +
+    geom_point(size=3.5, position=position_dodge(0.5)) + 
+    geom_errorbarh(position=position_dodge(0.5), height=0.15, lwd=0.5) +
+    scale_color_manual(values=c( palettes$NatComms[4], palettes$NatComms[3], palettes$NatComms[1]),
+                       name = "Loci Category", labels=labs) +
+    scale_shape_manual(values=c(19,17), name = "MR Method") +
+    xlab("MR Effect Estimate (95% CI)") + ylab("") +
+    theme(axis.text.y = element_text(color = "black", size = 10),
+          axis.text.x = element_text(color = "black", size = 10)) 
+}
+
+## Plot for all outcomes
+#p_forests <- lapply(outcomes, plot_mr_forest_bySNPset.fun)
+#ggsave(ggarrange(p_forests[[1]], p_forests[[2]], p_forests[[3]], p_forests[[4]], p_forests[[5]],
+#                 p_forests[[6]], p_forests[[7]], p_forests[[8]], nrow=2, ncol=4, common.legend = T),
+#       filename=paste0(mr_dir,"/",pheno_tag,"_mrForestBySNP_allOutcomes.pdf"),
+#       height=6, width=8)
+  
+
 ## Compile plots for all outcomes
 mr_sum_forest <- do.call(rbind.data.frame, lapply(
   as.list(outcomes), function(outcome) { 
     do.call(rbind.data.frame, lapply(snpsets, function(set) {
     mr_summary.l[[outcome]][[set]]$mr_summary %>% 
-        #filter(method == "MR Egger" | method == "Inverse variance weighted" | method == "Wald ratio") } )) %>%
+        #filter(method == "MR Egger" | method == "Inverse variance weighted") } )) %>%
         filter(method == "Inverse variance weighted" | method == "Wald ratio") %>% mutate(method=gsub("Inverse variance weighted","IVW",method)) } )) %>%
       mutate(snp_set = factor(snp_set, levels=c("All", "Refined", "Unrefined"))) %>%
-      #mutate(method = factor(method, levels=c("MR Egger", "Inverse variance weighted", "Wald ratio"), labels=c("MR Egger", "IVW", "Wald"))) %>%
-      #mutate(method = "IVW", "MR Egger") %>%
+      #mutate(method = factor(method, levels=c("MR Egger", "Inverse variance weighted"), labels=c("IVW", "MR Egger"))) %>%
+     #mutate(method = "IVW", "MR Egger") %>%
       mutate(b=ifelse(type=="or", log10(estimate), estimate)) })) %>%
   mutate(outcome=ifelse(id.outcome=="finn-b-I9_STR_EXH_EXNONE", "Ischemic stroke", ifelse(id.outcome=="ebi-a-GCST90018952", "DBP", outcome)))
   
@@ -180,20 +212,20 @@ labs<-sapply(c("All","Refined","Unrefined"), function(x) paste0(x, " (N=",mr_sum
 plot_mr_forest_bySNPset_allOutcomes <- mr_sum_forest %>% 
   ggplot(aes(x=b, xmin=b-1.96*se, xmax=b+1.96*se, y=snp_set, group=rev(snp_set), color=snp_set, shape=method)) +
   ggtheme + 
-  facet_wrap(~outcome, scales="free",ncol=3) +
+  facet_wrap(~outcome, scales="free_x",ncol=4) +
     geom_vline(xintercept = 0) + ggtheme +
-    geom_point(size=2.5, position=position_dodge(0.75)) + 
+    geom_point(size=2, position=position_dodge(0.75)) + 
     geom_errorbarh(position=position_dodge(0.75), height=0.25, lwd=0.5) +
     scale_color_manual(values=c( palettes$NatComms[4], palettes$NatComms[3], palettes$NatComms[1]),
                        name = "Loci Category", labels=labs) +
-    scale_shape_manual(values=c(19,17,16), name = "MR Method") +
+    scale_shape_manual(values=c(19,17), name = "MR Method") +
     xlab("MR Effect Estimate (95% CI)") + ylab("") +
     theme(axis.text.y = element_text(color = "black", size = 10), 
-          legend.position = "bottom") #+
-  #ggtitle(paste("MR Forest Plot:", diet_labels[pheno], "wtih all MR outcomes"))
+          legend.position = "bottom") +
+  ggtitle(paste("MR Forest Plot:", diet_labels[pheno], "wtih all MR outcomes"))
 
-ggsave(plot_mr_forest_bySNPset_allOutcomes, filename=paste0(mr_dir,"/",pheno_tag,"_plotMR_forestBySNPset_allOutcomes.pdf"),
-       height=7, width=6)
+ggsave(plot_mr_forest_bySNPset_allOutcomes, filename=paste0(mr_dir,"/",pheno_tag,"_plotMRforestBySNP_allOutcomes_wide.pdf"),
+       height=5, width=8)
 
 
 
@@ -201,7 +233,57 @@ ggsave(plot_mr_forest_bySNPset_allOutcomes, filename=paste0(mr_dir,"/",pheno_tag
 ## Panel plot of heterogeneity nd pleiotropy stats
 # ==========================================
 
-## Heterogeneity 
+plot_mr_valid_bySNPset.fun <- function(outcome, legend_drop=F, legend_position="right") {
+  
+  mr_val <- do.call(rbind.data.frame, lapply(snpsets, function(set) {
+    mr_summary.l[[outcome]][[set]]$mr_summary %>% 
+      select(snp_set, outcome, method, nsnp, starts_with("Q"), starts_with("egger")) %>%
+      mutate(egger_lci=egger_intercept-1.96*egger_se, 
+             egger_uci=egger_intercept+1.96*egger_se) %>%
+      filter(method == "MR Egger" | method == "Inverse variance weighted") } )) %>%
+    pivot_longer(c(Q, egger_intercept), names_to="measure") %>%
+    mutate(Measure=factor(measure, levels=c("Q", "egger_intercept"), labels=c("Heterogeneity", "Horizontal Pleiotropy"))) %>%
+    mutate(snp_set = factor(snp_set, levels=c("All", "Refined", "Unrefined"))) %>%
+    mutate(method = factor(method, levels=c("MR Egger", "Inverse variance weighted"), labels=c("MR Egger", "IVW"))) 
+  
+  labs<-sapply(c("All","Refined","Unrefined"), function(x) paste0(x, " (N=",mr_val$nsnp[mr_val$snp_set==x][1],")"))
+  p_het <- mr_val %>% 
+    filter(measure=="Q") %>%
+    ggplot(aes(x=method, y=value, fill=snp_set, group=snp_set)) +
+    facet_wrap(~Measure) + ggtheme +
+    geom_bar(stat="identity", position=position_dodge()) + 
+    ylab("Cochrane's Q") + xlab("") +
+    ylim(0, max(mr_val$value[mr_val$measure=="Q"])*1.10) +
+    scale_fill_manual(values=c(palettes$NatComms[4], palettes$NatComms[3], palettes$NatComms[1]),
+                       name = "Loci Set (N)", labels = labs) 
+  
+  yscale<-max(abs(c(mr_val$egger_lci[mr_val$measure=="egger_intercept"],mr_val$egger_uci[mr_val$measure=="egger_intercept"])),na.rm=T)
+  p_pleio <- mr_val %>%
+    filter(measure=="egger_intercept" & method=="MR Egger") %>% 
+    ggplot(aes(x=method, group=snp_set, y=value, ymin=value-1.96*egger_se, ymax=value+1.96*egger_se, fill=snp_set)) +
+    facet_wrap(~Measure) + ggtheme + 
+    geom_bar(stat = "identity", position=position_dodge(0.99)) + 
+    geom_hline(yintercept = 0, color = "black") +
+    geom_errorbar(width=0.2, position=position_dodge(0.99)) +
+    ylab("MR Egger Intercept (95% CI)") + xlab("") +
+    ylim(c(-1,1)*yscale) +
+    scale_fill_manual(values=c( palettes$NatComms[6], palettes$NatComms[7], palettes$NatComms[5]),
+                      name = "Loci Category", labels = labs) 
+    
+  p_val<-annotate_figure(
+    ggarrange(p_het, p_pleio, ncol=2, widths=c(1.35,0.85), common.legend = T, 
+              legend=ifelse(legend_drop==T, "none", legend_position)) +  
+      theme(plot.margin = margin(0.5,0.3,0.2,0.2, "cm")),
+    fig.lab = paste("MR of", diet_labels[pheno], "&", mr_val$outcome[1]), fig.lab.size = 14, fig.lab.face = "bold")
+  
+  get_legend(p_pleio)
+  
+  return(p_val)
+}
+
+
+
+## Separate plots, over all outcomes
 mr_val <- do.call(rbind.data.frame, lapply(
   as.list(outcomes), function(outcome) { 
     do.call(rbind.data.frame, lapply(snpsets, function(set) {
@@ -222,30 +304,27 @@ labs<-sapply(c("All","Refined","Unrefined"), function(x) paste0(x, " (N=",mr_val
 plot_mr_het_bySNPset_allOutcomes <- mr_val %>% 
   filter(measure=="Q") %>%
   ggplot(aes(x=method, y=value, fill=snp_set, group=snp_set)) +
-  facet_wrap(~outcome, scales="free_y",ncol=4) + ggtheme +
+  facet_wrap(~outcome, scales="free",ncol=4) + ggtheme +
   geom_bar(stat="identity", position=position_dodge()) + 
   ylab("Cochrane's Q") + xlab("") + 
   scale_fill_manual(values=c(palettes$NatComms[6], palettes$NatComms[7], palettes$NatComms[5]),
                     name = "Loci Category", labels = labs) +
-  theme(legend.position = "bottom", 
-        strip.text = element_text(face="bold", size=8))
+  theme(legend.position = "bottom")
 
 plot_mr_pleio_bySNPset_allOutcomes <- mr_val %>%
   filter(measure=="egger_intercept" & method=="MR Egger") %>% 
   ggplot(aes(x=snp_set, y=value, ymin=value-1.96*egger_se, ymax=value+1.96*egger_se, group=snp_set, fill=snp_set)) +
-  facet_wrap(~outcome, scales="free_y",ncol=4) + ggtheme +
+  facet_wrap(~outcome, scales="free",ncol=4) + ggtheme +
   geom_bar(stat = "identity", position=position_dodge(0.99)) + 
   geom_hline(yintercept = 0, color = "black", linewidth=0.15) +
   geom_errorbar(width=0.15, position=position_dodge(0.99), linewidth=0.35) +
   ylab("MR Egger Intercept (95% CI)") + xlab("") + 
   scale_fill_manual(values=c(palettes$NatComms[6], palettes$NatComms[7], palettes$NatComms[5]),
                     name = "Loci Category", labels = labs) +
-  theme(legend.position = "bottom",
-        axis.text.x=element_text(angle=25, size=8, hjust=1),
-        strip.text = element_text(face="bold", size=8))
+  theme(legend.position = "bottom")
 
-ggsave(plot_mr_het_bySNPset_allOutcomes, filename=paste0(mr_dir,"/", pheno_tag,"_plotMR_hetBySNPset_allOutcomes.pdf"), height=3.5, width=6.5)
-ggsave(plot_mr_pleio_bySNPset_allOutcomes, filename=paste0(mr_dir,"/", pheno_tag,"_plotMR_pleioBySNPset_allOutcomes.pdf"), height=3.5, width=6.5)
+ggsave(plot_mr_het_bySNPset_allOutcomes, filename=paste0(mr_dir,"/", pheno_tag,"_plotMRhetBySNPsetAllOutcomes.pdf"), height=4, width=8)
+ggsave(plot_mr_pleio_bySNPset_allOutcomes, filename=paste0(mr_dir,"/", pheno_tag,"_plotMRpleioBySNPsetAllOutcomes.pdf"), height=4, width=8)
 
 
 
@@ -264,9 +343,9 @@ ggsave(plot_mr_pleio_bySNPset_allOutcomes, filename=paste0(mr_dir,"/", pheno_tag
 ## Fstat ????
 # ==========================================
 
-#cbind(mr_summary.l$colorectal_cancer$All$mr_dat %>% select(SNP, Fstat))
-#range(mr_summary.l$colorectal_cancer$Refined$mr_dat %>% select(snp_set, SNP, Fstat))
-#mr_summary.l$colorectal_cancer$Unrefined$mr_dat %>% select(snp_set, SNP, Fstat)
+cbind(mr_summary.l$colorectal_cancer$All$mr_dat %>% select(SNP, Fstat))
+range(mr_summary.l$colorectal_cancer$Refined$mr_dat %>% select(snp_set, SNP, Fstat))
+mr_summary.l$colorectal_cancer$Unrefined$mr_dat %>% select(snp_set, SNP, Fstat)
 
 
 

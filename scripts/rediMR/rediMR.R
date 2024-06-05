@@ -188,6 +188,49 @@ cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno_tag, "_tabBch
 head(tabBchangeByCov)
 
 
+
+# =======================================================
+## Make SNPset files for downstream analysis
+# =======================================================
+
+snpset <- tabBchangeAllCov %>% select(snp, RefinedSet) 
+
+# rename SNPs to chr:pos format
+snpset <- snpset %>% 
+  mutate(ID=gsub("snp", "", gsub("[.]", ":", gsub("_[^_]*$", "", snp)))) %>%
+  rename(SNP=snp)
+
+snpset_ss <- ss %>% 
+  mutate(ID=gsub("snp", "", gsub("[.]", ":", SNP))) %>%
+  left_join(snpset, by = "ID")
+
+# make snp sets
+all <- snpset_ss$ID
+refined <- (snpset_ss %>% filter(RefinedSet==1))$ID
+unrefined <- (snpset_ss %>% filter(RefinedSet==0))$ID
+
+
+## RPS input files
+
+# All
+snpset_ss %>% 
+  select(ID, A1=EA, BETA) %>% 
+  write_tsv(file=paste0("../data/processed/prs/", pheno_tag,"_all_prsInput"))
+
+# Refined
+snpset_ss %>% 
+  filter(RefinedSet == 1) %>% 
+  select(ID, A1=EA, BETA) %>% 
+  write_tsv(file=paste0("../data/processed/prs/", pheno_tag,"_ref_prsInput"))
+
+# Unrefined
+snpset_ss %>% 
+  filter(RefinedSet == 0) %>% 
+  select(ID, A1=EA, BETA) %>% 
+  write_tsv(file=paste0("../data/processed/prs/", pheno_tag,"_unref_prsInput"))
+
+
+
 ###############################################################################
                       ## ~~~ Step 1 Completed !! ~~~~ ##
 cat(paste0("\n Congratulatulations!!\n",

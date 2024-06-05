@@ -126,6 +126,8 @@ EOF
 Rscript ../scripts/rediMR/prep_datInput.R ${pheno} ${tag} 
 
 
+
+
 ############################
 ## Run ReDiMR program -v1 ##
 ############################
