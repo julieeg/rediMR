@@ -37,12 +37,15 @@ ss %>% mutate(SNP = gsub(":", ".", ifelse(!startsWith(SNP, "rs"), paste0("snp", 
 # Build diet PCs for diet patterns ##
 #####################################
 
-#if(gsub(".*_", "", pheno) == "veg") { vars_to_exclude <- c("raw_veg", "cooked_veg") }
-#if(gsub(".*_", "", pheno) == "fruit") { vars_to_exclude <- c("fresh_fruit", "dried_fruit") }
-#if(gsub(".*_", "", pheno) == "coffee") { vars_to_exclude <- c("coffee") }
-#if(gsub(".*_", "", pheno) == "procmeat") { vars_to_exclude <- c("procmeeat") }
+if(pheno == "total_veg") { #gsub(".*_", "", pheno)
+  vars_to_exclude <- c("raw_veg", "cooked_veg") 
+  } else if(pheno == "total_fruit") { 
+    vars_to_exclude <- c("fresh_fruit", "dried_fruit") } else {
+      vars_to_exclude <- paste0(pheno) 
+  }
 
-paste0("Building diet patterns via pca WITHOUT: ", pheno)
+
+paste0("Building diet patterns via pca WITHOUT: ", vars_to_exclude)
 
 vars_for_pca <- dat %>% select(
   id,
@@ -65,7 +68,7 @@ vars_for_pca <- dat %>% select(
   mutate(across(where(is.numeric), function(i) remove_outliers.fun(i, SDs=5))) %>%
   mutate_at(vars(-id), function(x) ifelse(is.na(x), median(x, na.rm=T), x))  %>%
   
-  select(-starts_with(paste0(pheno)))
+  select(-(starts_with(vars_to_exclude)))
 
 
 ## Run PCA & save output as .rda
@@ -82,7 +85,9 @@ names(dat.dietPCs) <- c("id", paste0("dietPC", 1:ncol(diet_pcs$x)))
 #dat.diet <- left_join(vars_for_pca, dat.dietPCs, by = "id")
 
 
-print("Done deriving diet patterns")
+print("Done deriving diet patterns WITH:")
+names(vars_for_pca)
+
 
 
 
