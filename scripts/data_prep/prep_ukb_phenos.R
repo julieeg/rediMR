@@ -531,13 +531,17 @@ diet_all_id <- diet_id %>%
   left_join(., ffq_id, by = "id") %>%
   
   ## Replace values >5SD with NA********************
-  mutate(across(c(diet_vars), ~remove_outliers.fun(., SDs=5))) %>%
-  mutate(across(c(names(ffq_fields)), ~remove_outliers.fun(., SDs=5)))
+  mutate(across(c(diet_vars), ~winsorize(., SDs=5))) %>%
+  mutate(across(c(names(ffq_fields)), ~winsorize(., SDs=5)))
 
 
 print(paste0("Dietary data from UKB FFQs prepared for N = ", nrow(diet_all_id), " participants"))
 
 
+## FOR COMPARISON: make "raw" diet dataset without removing outliers
+diet_all_raw_id <- diet_id %>% 
+  left_join(., ffq_id, by = "id")
+  
 
 ######################
 ## genetic ancestry ##
@@ -592,30 +596,12 @@ phenos %>%
   saveRDS("../data/processed/ukb_phenos_unrelated.rda")
 
 
-# unrelated & by Ancestry
-phenos %>%
-  filter(unrelated == TRUE & ancestry == "EUR") %>%
-  write.table("../data/processed/ukb_phenos_unrelated_EUR.csv")
-
-phenos %>%
-  filter(unrelated == TRUE & ancestry == "AFR") %>%
-  write.table("../data/processed/ukb_phenos_unrelated_AFR.csv")
-
-phenos %>%
-  filter(unrelated == TRUE & ancestry == "AMR") %>%
-  write.table("../data/processed/ukb_phenos_unrelated_AMR.csv")
-
-phenos %>%
-  filter(unrelated == TRUE & ancestry == "CSA") %>%
-  write.table("../data/processed/ukb_phenos_unrelated_CSA.csv")
-
-phenos %>%
-  filter(unrelated == TRUE & ancestry == "EAS") %>%
-  write.table("../data/processed/ukb_phenos_unrelated_EAS.csv")
-
-phenos %>%
-  filter(unrelated == TRUE & ancestry == "MID") %>%
-  write.table("../data/processed/ukb_phenos_unrelated_MID.csv")
+## Merge phenotypes with RAW dietary data -----------------------
+unrelated_id <- (phenos %>% filter(unrelated == TRUE) %>% select(id))[[1]]
+diet_all_raw_id %>%
+  filter(id %in% unrelated_id) %>%
+  mutate(id = format(id, scientific=FALSE)) %>%
+  saveRDS("../data/processed/ukb_diet_raw_unrelated.rda")
 
 
 print("Done preparing UKB Phenotype data. Datasets are ready for analysis.")

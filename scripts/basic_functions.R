@@ -59,9 +59,9 @@ remove_outliers.fun <- function(x, SDs=5) {
 }
 
 
-# ========================
+# =================================================
 ## Median impute for negative or missing values
-# ========================
+# =================================================
 
 median_imp.fun <- function(x) {
   x.new <- ifelse(x == -1 | x == -3 | x == -9 | is.na(x) == T, median(x, na.rm=T), x)
@@ -69,14 +69,40 @@ median_imp.fun <- function(x) {
 }
 
 
-# ===================
-## Calculate zscore
-# ===================
+# ==========================
+## Winsorize data by SD
+# ==========================
+
+winsorize <- function(x, SDs=5) {
+  bounds <- mean(x, na.rm=T) + SDs * c(-1, 1) * sd(x, na.rm=T)
+  x <- ifelse(x<bounds[1], bounds[1], ifelse(x>bounds[2], bounds[2], x))
+  x
+}
+
+
+# ========================
+## Recode as zscore
+# ========================
+
 zscore.fun <- function(x) {
   z<-((x - mean(x, na.rm=T)) / sd(x, na.rm=T))
   return(z)
 }
 
+
+# ===========================================
+## Add descriptive labels to UKB variables
+# ===========================================
+
+descr_label.fun <- function(data, base_var, labs_vals) {
+  
+  base <- data %>% select(base_var) 
+  temp <- rep(NA, length(base))
+  
+  for(i in 1:length(labs_vals)) {
+    temp[base == labs_vals[[i]] ] <- names(labs_vals)[i]
+  } ; return(temp)
+}
 
 
 #########################################################################

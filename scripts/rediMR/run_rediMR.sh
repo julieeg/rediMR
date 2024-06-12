@@ -12,6 +12,7 @@
 ## ReDiMR Inputs
 pheno=$1
 tag=$2
+covarSet=$3
 pheno_tag=${pheno}_${tag}
 
 ssFile=../data/processed/gwas/${pheno_tag}.gwas
@@ -134,11 +135,12 @@ Rscript ../scripts/rediMR/prep_datInput.R ${pheno} ${tag}
 
 ssInput=${outDir}/${pheno_tag}_ssInput.csv 
 datInput=${outDir}/${pheno_tag}_datInput.rda 
+covarSer=${covarSet}
 outDir=${outDir} 
 pctBthhold=20 
 
 
-Rscript ../scripts/rediMR/rediMR.R $pheno $tag $ssInput $datInput $pctBthhold $outDir
+Rscript ../scripts/rediMR/rediMR.R $pheno $tag $ssInput $datInput $covarSet $pctBthhold $outDir
 
 
 

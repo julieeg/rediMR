@@ -3,78 +3,53 @@
 
 
 
-
-##################################
-##  Set up & assign parameters  ##
-##################################
-
-# =======================
-##  Set up
-# =======================
-
 # load required packages
 lapply(c("tidyverse", "data.table", "parallel", "paletteer", "RColorBrewer",
          "ggpubr", "R3port", "tinytex"),  
        library, character.only = TRUE)
 
+
+# load pantry file with stored parameters, basic functions & ggplot templates
+source("../scripts/pantry.R")
+
+
+
+##################################
+##  Set up & input parameters  ##
+##################################
+
+# ==========================
+## Load command arguments
+# ==========================
+
 # command args
 args <- commandArgs(trailingOnly = TRUE)
-pheno <- args[1]
-tag <- args[2]
+pheno <- args[1] #diet phenotype
+tag <- args[2] #version "tag"
 pheno_tag <- paste0(pheno, "_", tag)
 
 ssInput <- args[3] #paste0("../data/processed/rediMR/", pheno_tag, "_ssInput.csv")
 datInput <- args[4] #paste0("../data/processed/rediMR/", pheno_tag, "_datInput.rda") 
-pctBthold <- args[5] #20 
-outDir <- args[6] #dirname(datInput)
+covarSet <- args[5]
+pctBthold <- args[6]
+outDir <- args[7]
+
+# Add second tag 
+if(length(args) == 8) {
+  tag2 = args[8]
+}
 
 
-# load basic functions
-source("../scripts/basic_functions.R")
-
-
-# =======================
-##  Assign parameters
-# =======================
-
-# covariates in base gwas
-gwasCovars <- c("age","sex", paste0("gPC", 1:10))
-
-
-# covariates to adjust for in ReDiMR
-adjCovars <- c("smoke_level.lab", "alch_freq.lab", "pa_met_excess_level.lab", 
-               "income_level.lab", "educ_level.lab", "bmi", "waist2hip", paste0("dietPC", 1:10))
-
-## Format covariates for adjustment 
-adjCovarNames <- c(
-    smoke_level.lab="Smoking", alch_freq.lab="Alcohol", 
-    pa_met_excess_level.lab="Physical Activity", income_level.lab = "Income", 
-    educ_level.lab="Education", bmi="BMI", waist2hip="Waist-to-hip",
-    dietPC1="Diet Pattern PC1", dietPC2="Diet Pattern PC2", dietPC3="Diet Pattern PC3",
-    dietPC4="Diet Pattern PC4", dietPC5="Diet Pattern PC5", 
-    #`dietPC1+dietPC2+dietPC3+dietPC4+diePC5`="Top 5 Diet Patterns", 
-    dietPC6="Diet Pattern PC6", dietPC7="Diet Pattern PC7", dietPC8="Diet Pattern PC8", 
-    dietPC9="Diet Pattern PC9", dietPC10="Diet Pattern PC10"
-)
-
-# Write as lists
-adjCovars.l <- as.list(adjCovars)
-adjCovarNames.l <- as.list(adjCovarNames)
-
+# covariate sets
+adjCovars.l <- as.list(adjCovarSets[[covarSet]]$adjCovars)
+adjCovarNames.l <- as.list(adjCovarSets[[covarSet]]$adjCovarNames)
 nCovars.l <- as.list(1:length(adjCovarNames.l))
 
 
 ## Inputs & parameters
-cat("\n ReDiMR Inputs: \n -ssInput ", ssInput, "\n -datInput ", datInput, "\n -pctBthold ", pctBthold, "\n -outDir ", outDir, "\n")
-
+cat("\n ReDiMR Inputs: \n -pheno ", pheno, "\n -tag ", tag,  "\n -ssInput ", ssInput, "\n -datInput ", datInput, "\n -covarSet ", covarSet, "\n -pctBthold ", pctBthold, "\n -outDir ", outDir, "\n")
 cat("\n Covariates for adjustment: \n", paste0(" - ", t(list2DF(adjCovarNames.l)), "\n"))
 
-
-
-
-#################################################################
-##  Load input files ; Write functions to calculate %B change  ##
-#################################################################
 
 # ==========================================
 ## Load data input files
@@ -139,8 +114,7 @@ print_summary_table <- function(pheno) {
   } ))
 }
 
-print_summary_table("raw_veg") %>% write.csv(file = paste0(outDir, "/", pheno_tag, "_tabDescrByCov.csv"), row.names=T)
-
+print_summary_table("raw_veg") %>% write.csv(file = paste0(outDir, "/", pheno_tag, "_tabDescrByCov_", covarSet, ".csv"), row.names=T)
 
 
 
@@ -162,9 +136,9 @@ tabBchangeAllCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) {
 
 
 # Write results to csv
-write.csv(tabBchangeAllCov, file = paste0(outDir, "/", pheno_tag, "_tabBchangeAllCov.csv"), row.names=T)
+write.csv(tabBchangeAllCov, file = paste0(outDir, "/", pheno_tag, "_tabBchangeAllCov_", covarSet, ".csv"), row.names=T)
 
-cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno_tag, "_tabBchangeAllCov.csv")))
+cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno_tag, "_tabBchangeAllCov_", covarSet, ".csv")))
 head(tabBchangeAllCov)
 
 
@@ -182,9 +156,9 @@ tabBchangeByCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) {
                    replace_covar_name=adjCovarNames[[i]], data=dat) }, mc.cores = 8))  }, mc.cores = 8))
 
 # Write results to csv
-fwrite(tabBchangeByCov, file = paste0(outDir, "/", pheno_tag, "_tabBchangeByCov.csv"))
+fwrite(tabBchangeByCov, file = paste0(outDir, "/", pheno_tag, "_tabBchangeByCov_", covarSet, ".csv"))
 
-cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno_tag, "_tabBchangeByCov.csv")))
+cat (paste0("DONE: Results written to ", paste0(outDir, "/", pheno_tag, "_tabBchangeByCov_", covarSet, ".csv")))
 head(tabBchangeByCov)
 
 
@@ -210,24 +184,24 @@ refined <- (snpset_ss %>% filter(RefinedSet==1))$ID
 unrefined <- (snpset_ss %>% filter(RefinedSet==0))$ID
 
 
-## RPS input files
+## PRS input files
 
 # All
 snpset_ss %>% 
   select(ID, A1=EA, BETA) %>% 
-  write_tsv(file=paste0("../data/processed/prs/", pheno_tag,"_all_prsInput"))
+  write_tsv(file=paste0("../data/processed/prs/", pheno_tag, "_", covarSet, "_all_prsInput"))
 
 # Refined
 snpset_ss %>% 
   filter(RefinedSet == 1) %>% 
   select(ID, A1=EA, BETA) %>% 
-  write_tsv(file=paste0("../data/processed/prs/", pheno_tag,"_ref_prsInput"))
+  write_tsv(file=paste0("../data/processed/prs/", pheno_tag, "_", covarSet, "_ref_prsInput"))
 
 # Unrefined
 snpset_ss %>% 
   filter(RefinedSet == 0) %>% 
   select(ID, A1=EA, BETA) %>% 
-  write_tsv(file=paste0("../data/processed/prs/", pheno_tag,"_unref_prsInput"))
+  write_tsv(file=paste0("../data/processed/prs/", pheno_tag, "_", covarSet, "_unref_prsInput"))
 
 
 
