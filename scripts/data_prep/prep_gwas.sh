@@ -8,7 +8,7 @@
 #$ -cwd
 
 
-
+CHR=$SGE_TASK_ID
 ANC=$1
 
 
@@ -25,21 +25,7 @@ reuse -q Anaconda3
 source activate ../opt/bgen
 
 
-
-
-## Prepare phenotype file (format as #FID IID; as tsv)
-R --no-save <<EOF
-library(dplyr) ; library(data.table) 
-fread("../data/processed/ukb_phenos_unrelated.csv", header=T) %>% filter(ancestry == "${ANC}") %>% \
-mutate(FID=id, IID=id) %>% \
-relocate(FID, IID, .before=id) %>% \
-mutate(across(colnames(.), function(x) gsub(" ", "_", x))) %>% rename('#FID'=FID) %>% \
-write.table("../data/processed/gwas/ukb_phenos_unrelated_${ANC}_gwas.txt", col.names=T, row.names=F, quote=F)
-EOF
-
-
-
-## Prepare genotype data
+## Prepare chr files genotype data
 
 # filter SNPs by maf>0.005 & info>0.4
 awk -v CHR=$CHR '{ if ( $6 > 0.005 && $8 > 0.4 ) { print $2 }  }' ${ukb_bgen_dir}/ukb_mfi_chr${CHR}_v3.txt > ../data/processed/gwas/snplist_chr${CHR}_maf005_imp04.txt

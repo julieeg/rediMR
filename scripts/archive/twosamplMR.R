@@ -2,6 +2,18 @@
 # Last updated: June 3, 2023
 
 
+
+# load required packages
+lapply(c("tidyverse", "data.table", "parallel", "paletteer", "RColorBrewer",
+         "ggpubr", "R3port", "tinytex"),  
+       library, character.only = TRUE)
+
+
+# RUn pantry file with stored parameters
+source("../scripts/pantry.R")
+
+
+
 #################################
 ## Set up & assign parameters  ##
 #################################
@@ -10,28 +22,25 @@
 ##  Set up
 # =======================
 
-# load required packages
-lapply(c("tidyverse", "data.table", "parallel", "paletteer", "RColorBrewer",
-         "ggpubr", "R3port", "tinytex"),  
-       library, character.only = TRUE)
-
-
 # command args
 args <- commandArgs(trailingOnly = TRUE)
 pheno <- args[1]
 tag <- args[2]
+covarSet <- args[3]
+
+adjBeta <- args[4]
+
+
 #outcome_id <- args[3]
 
 pheno_tag <- paste0(pheno, "_", tag)
+pheno_tag_covarSet <- paste0(pheno_tag, "_", covarSet)
 
-rediMR_inputPref=paste0("../data/processed/rediMR/", pheno_tag)
+rediMR_inputPref=paste0("../data/processed/rediMR/", pheno_tag_covarSet)
 ssInput <- paste0(rediMR_inputPref, "_ssInput.csv") #args[3]
 datInput <- paste0(rediMR_inputPref, "_datInput.rda")  #args[4] 
 outDir <- "../data/processed/mr" #args[6]
 
-
-# load basic functions
-source("../scripts/basic_functions.R")
 
 
 #################################################################
@@ -80,6 +89,15 @@ afreq <- fread(paste0("../data/processed/rediMR/", pheno_tag, "_loci.afreq")) %>
   #mutate(SNP=ifelse(!startsWith(ID, "rs"), gsub(":", ".", paste0("snp", ID)), ID)) %>%
   mutate(REF_FREQS = 1-ALT_FREQS) %>% 
   select(SNP=ID, ALT_FREQS, REF_FREQS, REF_FREQ_ALLELE=REF, ALT_FREQ_ALLELE=ALT) 
+
+
+# If adjusted Betas should be used in the MR
+if(adjBetaMR == "TRUE") {
+  ss <- ss %>% rowwise() %>% 
+    mutate(BETA = tabBchangeAllCov$B_adj[which(startsWith(tabBchangeAllCov$snp, SNP))])  %>%
+    mutate(SE = tabBchangeAllCov$SE_adj[which(startsWith(tabBchangeAllCov$snp, SNP))])  %>%
+    ungroup()
+}
 
 
 exposure_dat <- ss %>% rowwise() %>% 
@@ -184,7 +202,7 @@ mr_results.l <- lapply(outcome_dat.l, function(outcome) {
     return(sets.l)})
 
 lapply(as.list(1:nOutcomes), function(i) {
-  saveRDS(mr_results.l[[i]], file = paste0(outDir, "/", pheno_tag, "_MRsummary_", names(outcome_dat.l)[i], ".rda"))
+  saveRDS(mr_results.l[[i]], file = paste0(outDir, "/", pheno_tag_covarSet, "_MRsummary_", names(outcome_dat.l)[i], ".rda"))
 })
 
 

@@ -303,7 +303,7 @@ print(paste0("DONE: Biochemical & anthropometric phenotypes prepared for ", nrow
 
 
 ##################################################
-## Diet from FFQs & Nutrient intakes from 24HRR ## 
+##  Diet from FFQs & Nutrient intakes from FFQ  ## 
 ##################################################
 print("Preparing dietary data ...")
 
@@ -542,6 +542,12 @@ print(paste0("Dietary data from UKB FFQs prepared for N = ", nrow(diet_all_id), 
 diet_all_raw_id <- diet_id %>% 
   left_join(., ffq_id, by = "id")
   
+
+
+## 24HR dietary data
+
+
+
 
 ######################
 ## genetic ancestry ##

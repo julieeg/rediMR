@@ -24,7 +24,7 @@ out_dir="../output"
 
 
 # load basic functions
-source("../scripts/basic_functions.R")
+source("../scripts/pantry.R")
 
 
 # Load 1 dataInput file & remove food-specific vars 
@@ -94,22 +94,6 @@ adjCovarNames <- c(
 #################################################################################
 ##  Descriptive plots of diet traits, diet patterns & covariates 
 ################################################################################
-
-# set ggplot theme
-ggtheme <- theme(panel.grid.minor.y = element_blank(), 
-                panel.grid.minor.x = element_blank(), 
-                axis.text.x = element_text(color="black", size=8), #angle=35, hjust=1, 
-                axis.text.y = element_text(color="black", size=8),
-                axis.title = element_text(color="black", size=8),
-                legend.position = "right", 
-                legend.box.background = element_rect(color = "black"),
-                legend.key.size = unit(0.25, 'line'),
-                legend.margin = margin(0.2,0.2,0.2,0.2, unit="pt"),
-                legend.text = element_text(size=8), 
-                legend.title = element_text(face="bold", size=8),
-                plot.title=element_text(size=8),
-                strip.text = element_text(face="bold", size=8)
-)
 
 
 ## Panel FOOD Histograms
