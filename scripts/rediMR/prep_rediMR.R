@@ -154,51 +154,6 @@ cbind.data.frame(
 dim(vars_for_pca)
 
 
-# ====================================
-## diet PCs WITH pheno: dietPCall
-# ====================================
-
-paste0("Building diet patterns via pca WITH: all 24 diet vars")
-
-vars_for_pca_all <- dat %>% select(
-  id,
-  cooked_veg_QT=cooked_veg, raw_veg_QT=raw_veg,
-  fresh_fruit_QT=fresh_fruit, dried_fruit_QT=dried_fruit, 
-  oily_fish_QT=oily_fish, nonoily_fish_QT=nonoily_fish,
-  procmeat_QT=procmeat, poultry_QT=poultry, cheese_QT=cheese,
-  beef_QT=beef, lamb_QT=lamb, pork_QT=pork, 
-  bread_type_white_vs_brown_or_whole_BIN=bread_type_white_vs_brown_or_whole, 
-  bread_intake_QT=bread_intake,
-  milk_type_full_vs_low_or_nonfat_BIN=milk_type_full_vs_low_or_nonfat,
-  cereal_type_sugar_vs_any_bran_BIN=cereal_type_sugar_vs_any_bran, cereal_intake_QT=cereal_intake,
-  spread_type_butter_vs_any_other_BIN=spread_type_butter_vs_any_other,
-  coffee_type_decaf_vs_regular_BIN=coffee_type_decaf_vs_regular, coffee_QT=coffee,
-  tea_QT=tea, water_QT=water, 
-  addsalt_always_often_vs_nrs_BIN=addsalt_always_often_vs_nrs,
-  hotdrink_temp_hot_or_vhot_vs_warm_BIN=hotdrink_temp_hot_or_vhot_vs_warm) %>%
-  
-  # Replace missing data with median values
-  mutate_at(vars(-id), function(x) ifelse(is.na(x), median(x, na.rm=T), x)) %>%
-  
-  # Winzorise
-  mutate(across(where(is.numeric), ~winsorize(., SDs=5))) %>%
-  filter(complete.cases(.)==T)
-
-
-## Run PCA & save output as .rda
-diet_pcsall <- prcomp(select(vars_for_pca_all, -id), scale.=T)  # Run PCA
-saveRDS(diet_pcsall, paste0(redimrDir, "/", pheno_tag, "_dietPCsall.rda"))
-
-
-# Extract dietPC scores
-dat.dietPCsAll <- cbind.data.frame(vars_for_pca_all$id, diet_pcsall$x)
-names(dat.dietPCsAll) <- c("id", paste0("dietPC", 1:ncol(diet_pcsall$x), "all"))
-
-
-print("Done deriving diet patterns WITH:")
-c(names(vars_for_pca_all))
-
-
 
 ########################################################
 ##  Merge data & write rda files for rediMR pipeline  ##
@@ -210,7 +165,7 @@ print("Compiling datasets and writing .rda file")
 # Merge in diet data
 dat.merged <- left_join(
   dat, 
-  left_join(dat.dietPCs, dat.dietPCsAll, by = "id"), 
+  left_join(dat.dietPCs, by = "id"), 
   by = "id") %>%
   saveRDS(paste0(redimrDir, "/", pheno_tag, "_datInput.rda"))
 

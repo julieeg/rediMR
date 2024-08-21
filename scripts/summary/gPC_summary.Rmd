@@ -1,0 +1,104 @@
+---
+title: "gPC_summary"
+output: html_document
+date: "2024-08-21"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=F, message=F,warning=F, 
+                      fig.path="../output/")
+
+# load required packages
+suppressMessages(silent <- lapply(c("tidyverse", "data.table", "parallel", "paletteer", "RColorBrewer", "ggpubr"),  
+       library, character.only = T))
+
+# Run pantry.R file
+source("../scripts/pantry.R")
+
+```
+
+
+```{r params}
+
+redimrDir="../data/processed/rediMR"
+mrDir="../data/processed/MR"
+
+```
+
+
+```{r load-sets} 
+# ==========================
+## Load data for raw_veg 
+# ==========================
+veg_tag <- paste0("raw_veg_", tag)
+veg_dat = readRDS(paste0(redimrDir, "/", veg_tag, "_datInput.rda"))
+veg_gPCs = fread("../data/processed/rediMR/raw_veg_v2_geneticPCs_agesex_tabBchangeAll.csv")
+
+```
+
+# Plot % B change as dot plot
+```{r}
+
+tab <- veg_gPCs %>%
+    pivot_Bdat_to_long() %>%
+    mutate(Covar = factor(Covar, levels=c(covarSetGroups$geneticPCs$Labels)))
+  
+  yscale <- ceiling(max(abs(tab$B_pctChange))*1.05)
+
+  tab %>%
+    filter(Covar != "Unadjusted") %>%
+    ggplot(aes(x=Covar, y = B_pctChange, color = Covar, group=snp)) + 
+    theme_bw() + ggtheme2 +
+    geom_hline(yintercept = 0, color = "black") + 
+    geom_point(size=1.35, position=position_jitter(0.15), alpha=0.95) + 
+    scale_y_continuous(limits=c(-yscale, yscale), breaks=c(-60, -40, -20, -10, 10, 20, 40, 60)) +
+    geom_hline(yintercept = c(-10, 10), color = "black", linetype = "dashed") + 
+    scale_color_manual(values =  plot_colors, name = "Confounder", guide=F) +
+    #ylab("% change in SNP-diet estimate \n with confounder adjustment") + xlab(" ") + 
+    ylab("% change in SNP-diet estimate") + xlab(" ") + 
+    theme(axis.text.x = element_text(angle=25, hjust=1, size=8),
+          axis.title = element_text(size=8), axis.text.y=element_text(size=8))
+}
+
+```
+
+```{r}
+
+# ==========================================================================
+## Function to plot BETA (adjusted) when ADDING adjustment for all dietPCs
+# ==========================================================================
+
+# Dot plot of pctBchange when adjusting for ALL covariates
+tab_all <- veg_gPCs %>%
+   pivot_Bdat_to_long() %>%
+    mutate(Covar = factor(Covar, levels=c(covarSetGroups$geneticPCs$Labels)))
+  filter((Covar=="Top1DietPCs" & mod == "base") | mod == "adj") %>%
+    mutate(shape=ifelse(nPCs==0, "square", "dot"))
+  
+  yscale<-max(abs(tab_all$lowCI*1.0), abs(tab_all$upCI*1.0))
+  
+  # If plotPCs != all, which PCs should be plotted?
+  tab_all %>% 
+    ggplot(aes(x=as.numeric(gPCs), y = B, group=snp, color = as.factor(gPCs))) + 
+    theme_bw() + ggtheme2 + 
+    geom_hline(yintercept = 0, color = "black") + 
+    geom_point(size=1.55, alpha=0.95) +
+    geom_line(linewidth=0.15) +
+    scale_color_manual(values=c(palettes$classicorange)) +
+    #ylim(-yscale, yscale) +
+    scale_x_continuous(breaks=plotPCs) +
+    scale_shape_manual(values=c("square"=15, "dot"=19)) +
+    #ylab("SNP-diet estimate (95% CI) \n with DietPC adjustment") + 
+    ylab("SNP-diet estimates (95% CI)") + 
+   # xlab("n dietPCs adjusted") +
+    xlab(NULL) +
+    theme(legend.position = "none",
+          axis.text = element_text(size=8), axis.title = element_text(size=8))
+}
+
+
+```
+
+
+
+

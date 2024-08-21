@@ -13,6 +13,7 @@
 pheno=$1
 tag=$2
 covarSet=$3
+baseCovars=$4
 
 pheno_tag=${pheno}_${tag}
 
@@ -37,7 +38,7 @@ use R-4.1
 ##  ~~~~~  Run ReDiMR program  ~~~~~  ##
 ########################################
 
-Rscript ../scripts/rediMR/rediMR.R $pheno $tag $covarSet $ssInput $datInput $pctBthhold $redimrDir &&
+Rscript ../scripts/rediMR/rediMR.R $pheno $tag $covarSet $baseCovars $ssInput $datInput $pctBthhold $redimrDir &&
 echo CONGRATULATIONS! You completed rediMR for $pheno, adjusting for $covarSet covariates.
 
 

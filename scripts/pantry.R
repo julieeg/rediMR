@@ -15,110 +15,118 @@ library(tidyverse) ; library(table1)
 ##  Covariate sets
 # =========================================
 
-## Base GWAS ===========
-gwasCovarsBase <- paste0(c("age","sex", paste0("gPC", 1:10)), collapse = "+")
-covarSetgwas <- c("age","sex", paste0("gPC", 1:10))
+## Base covariates ===========
+covarSetsBase <- list(
+  
+  gwas = list(
+    Label="Base covariates",
+    Covars=c("age","sex", paste0("gPC", 1:10)),
+    Formatted=paste0(c("age","sex", paste0("gPC", 1:10)), collapse = "+")
+    ),
+  
+  agesex = list(
+    Label="Base covariates",
+    Covars=c("age","sex"),
+    Formatted=paste0(c("age","sex"), collapse = "+")),
+  
+  dietpcs = list(
+    Label="All Diet PCs",
+    Covars=c(paste0("dietPC", 1:23)),
+    Formatted=paste0("dietPC", 1:23, collapse="+"))
+  
+)
 
-gwasCovarsBaseAgeSex <- c("age","sex")
-covarSetgwasAgeSex <- c("age","sex", paste0("gPC", 1:10))
 
-## Diet PCs for rediMR adjustment ===========
-
-# Diet PCs without pheno 
+## Top 1-23 diet PCs (no confounders) ===========
 covarSets <- list()
 for (i in 1:23) {
-  
   covarSets[[i]] <- list(
     Label=paste0("Top", i, "DietPCs"),
     Covars=c(sapply(1:i, function(j) paste0("dietPC", j))),
     Names=c(sapply(1:i, function(j) paste0("Diet Pattern PC", j)))
   ) ; names(covarSets[[i]]$Names) <- c(covarSets[[i]]$Covars)
-  
 } ; names(covarSets) <- c("dietpc1", paste0("dietpctop", 2:23))
 
+covarSets$alldietpcs = list(
+  Label = "DietPCs",
+  Covars = paste0(covarSets$dietpctop23$Covars, collapse = "+"),
+  Names = "DietPCs"
+)
 
-# "Standard" rediMR covariates
-covarSets$stnd = list(
-  Label = "Standard",
+## Confounders ==============
+
+confounder_Label <- c("Smoking"="smoke", "Alcohol"="alch", "Physical Activity"="pa", 
+                      "Income"="inc", "Education"="educ", 
+                      "BMI"="bmi", "Waist2Hip"="w2h")
+
+covarSets$confounders = list(
+  Label = "All_Confounders",
   Covars = c(
     "smoke_level.lab", "alch_freq.lab", "pa_met_excess_level.lab", 
-    "income_level.lab", "educ_level.lab", "bmi", "waist2hip"), #, paste0("dietPC", 1:10)),
+    "income_level.lab", "educ_level.lab", "bmi", "waist2hip"),
   Names = c(
     smoke_level.lab="Smoking", alch_freq.lab="Alcohol", 
     pa_met_excess_level.lab="Physical Activity", income_level.lab = "Income", 
-    educ_level.lab="Education", bmi="BMI", waist2hip="Waist-to-hip") #,
-    #dietPC1="Diet Pattern PC1", dietPC2="Diet Pattern PC2", dietPC3="Diet Pattern PC3",
-    #dietPC4="Diet Pattern PC4", dietPC5="Diet Pattern PC5", 
-    #dietPC6="Diet Pattern PC6", dietPC7="Diet Pattern PC7", dietPC8="Diet Pattern PC8", 
-    #dietPC9="Diet Pattern PC9", dietPC10="Diet Pattern PC10") 
+    educ_level.lab="Education", bmi="BMI", waist2hip="Waist2Hip")
   )
 
+covarSets$confounders_num = list(
+  Label = "All_Confounders (numeric)",
+  Covars = c(
+    "smoke_level.num", "alch_freq.num", "pa_met_excess_level.num", 
+    "income_level.num", "educ_level.num", "bmi", "waist2hip"),
+  Names = c(
+    smoke_level.lab="Smoking", alch_freq.lab="Alcohol", 
+    pa_met_excess_level.lab="Physical Activity", income_level.lab = "Income", 
+    educ_level.lab="Education", bmi="BMI", waist2hip="Waist2Hip")
+)
 
-# Diet PCs WITH pheno ================
+## genetic PCs 
+add_covarset <- list()
+for(i in 1:20) {
+  add_covarset[[i]] <- list(
+    Label = paste0("Top", i, "geneticPCs"),
+    Covars = c(sapply(1:i, function(j) paste0("gPC", j))),
+    Names = c(sapply(1:i, function(j) paste0("Genetic PC", j)))
+    ) ; names(add_covarset[[i]]$Names) <- c(add_covarset[[i]]$Covars)
+} ; names(add_covarset) <- c(paste0("gPCtop", 1:20))
 
-covarSetsAdd <- list()
-for (i in 1:24) {
-  
-  covarSetsAdd[[i]] <- list(
-    Label=paste0("Top", i, "DietPCsAll"),
-    Covars=c(sapply(1:i, function(j) paste0("dietPC",j,"all"))),
-    Names=c(sapply(1:i, function(j) paste0("Diet Pattern PC", j, " (All)")))
-  ) ; names(covarSetsAdd[[i]]$Names) <- c(covarSetsAdd[[i]]$Covars)
-  
-} ; names(covarSetsAdd) <- c("dietpc1all", paste0("dietpctop", 2:24, "all"))
+## Top 1-23 diet PCs and EACH confounder ===================
+dietEachConf = list(
+    Label="Diet PCs + Each Confounder",
+    Covars=c(sapply(1:length(confounder_Label), function(i) {paste0(paste0(covarSets$dietpctop23$Covars, collapse="+"), "+", covarSets$confounders_num$Covars[i])})),
+    Names=c(sapply(1:length(confounder_Label), function(i) paste0("Diet PCs + ", names(confounder_Label)[i])))
+) ; names(dietEachConf$Names) <- paste0("dietpcsAnd", confounder_Label)
 
-
-## Append
-covarSets <- c(covarSets, covarSetsAdd)
-
-
-## Add diet PCs with EACH confounder ===================
-
-confounder_pref <- c("Smoke"="smoke", "Alch"="alch", "PhysAct"="pa", "Income"="inc", "Educ"="educ", "BMI"="bmi", "Waist2Hip"="w2h")
-confounder_vars.num <- c("smoke_level.num","alch_freq.num","pa_met_excess_level.num", "income_level.num", "educ_level.num","bmi", "waist2hip")
-
-dietEachconf <- list(
-    Labels=c(sapply(1:length(confounder_pref), function(i) paste0("DietPCs_", names(confounder_pref)[i]))),
-    Covars=c(sapply(1:length(confounder_pref), function(i) {paste0(paste0(covarSets$dietpctop23$Covars, collapse="+"), "+", confounder_vars.num[i])})),
-    Names=c(sapply(1:length(confounder_pref), function(i) paste0("All Diet PCs + ", names(confounder_pref)[i])))
-) ; names(dietEachconf$Names) <- names(confounder_pref) ; names(dietEachconf$Covars) <- paste0("dietpcsAnd", names(confounder_pref))
-
-
-covarSetsAdd3 <- list()
-for(i in 1:length(confounder_pref)) {
-  
-  covarSetsAdd3[[i]] <- list(
-    Labels=dietEachconf$Labels[i],
-    Covars=dietEachconf$Covars[i],
-    Names=dietEachconf$Names[i]
-    ) ; names(covarSetsAdd3[[i]]$Names) <- paste0("dietpcsAnd", confounder_pref[i])
-} ; names(covarSetsAdd3) <- paste0("dietpcsAnd", confounder_pref)
+add_covarset2 <- list()
+for(i in 1:length(confounder_Label)) {
+  add_covarset2[[i]] <- list(
+    Label = dietEachConf$Names[[i]],
+    Covars = dietEachConf$Covars[i],
+    Names = dietEachConf$Names[i])
+} ; names(add_covarset2) <- names(dietEachConf$Names)
   
 
+## Top 1-23 diet PCs with sequentially ADDED confounders =========================
+dietAddConf = list(
+  Label = "Diet PCs Adding Confounders", 
+  Covars = c(sapply(1:length(confounder_Label), function(i) {paste0(covarSets$alldietpcs$Covars, "+", paste0(covarSets$confounders_num$Covars[1:i], collapse = "+"))})),
+  Names = c(sapply(1:length(confounder_Label), function(i) paste0("Diet PCs + ", i, " Confounders (+", names(confounder_Label)[i], ")") ))
+) ; names(dietAddConf$Names) <-  paste0("dietpcsAdd", confounder_Label)
 
-## Add diet PCs with ADDED confounders =========================
-
-dietAddconf <- list(
-  Labels=c(sapply(1:length(confounder_pref), function(i) paste0("DietPCs_Add", i, "c", names(confounder_pref)[i]))),
-  Covars=c(sapply(1:length(confounder_pref), function(i) {paste0(paste0(covarSets$dietpctop23$Covars, collapse="+"), "+", paste0(confounder_vars.num[1:i], collapse = "+"))})),
-  Names=c(sapply(1:length(confounder_pref), function(i) paste0("All Diet PCs + ", i, " Confounders (+", names(confounder_pref)[i], ")") ))
-) ; names(dietAddconf$Names) <- names(confounder_pref) ; names(dietAddconf$Covars) <- paste0("dietpcsAdd", names(confounder_pref))
-
-
-covarSetsAdd4 <- list()
-for(i in 1:length(confounder_pref)) {
-  
-  covarSetsAdd4[[i]] <- list(
-    Labels=dietAddconf$Labels[i],
-    Covars=dietAddconf$Covars[i],
-    Names=dietAddconf$Names[i]
-  ) ; names(covarSetsAdd4[[i]]$Names) <- paste0("dietpcsAdd", confounder_pref[i])
-} ; names(covarSetsAdd4) <- paste0("dietpcsAdd", confounder_pref)
+add_covarset3 <- list()
+for(i in 1:length(confounder_Label)) {
+  add_covarset3[[i]] <- list(
+    Labels = dietAddConf$Names[i],
+    Covars = dietAddConf$Covars[i],
+    Names = dietAddConf$Names[i]) 
+} ; names(add_covarset3) <- names(dietAddConf$Names)
 
 
 ## append
-covarSets <- c(covarSets, covarSetsAdd3, covarSetsAdd4) 
+covarSets <- c(covarSets, add_covarset, add_covarset2, add_covarset3) 
 
+names(covarSets)
 
 
 ###############################
@@ -133,30 +141,26 @@ covarSetGroups <- list(
                        dietpctop15 = "Top 15 Diet PCs", dietpctop20="Top 20 Diet PCs"),
     Labels = c("Diet PC1", "Top 5 Diet PCs", "Top 10 Diet PCs", "Top 15 Diet PCs", "Top 20 Diet PCs")),
   
-  dietGroup2 = list(
+  dietPCs = list(
     Sets = c(names(covarSets)[1:23]),
     Names = c(sapply(c(1:23), function(i) covarSets[[i]]$Names)),
-    Labels =  c(sapply(c(1:23), function(i) covarSets[[i]]$Label))
-    ),
-  
-  dietGroup3 = list(
-    Sets = c(names(covarSets)[25:48]),
-    Names = c(sapply(c(25:48), function(i) covarSets[[i]]$Names)),
-    Labels = c(sapply(c(25:48), function(i) covarSets[[i]]$Label))
-  ),
+    Labels = c(sapply(c(1:23), function(i) covarSets[[i]]$Label))),
   
   dietEachConf = list(
-    Sets = c(names(covarSets)[c(1:23,49:55)]),
-    Names = c(sapply(c(1:23,49:55), function(i) covarSets[[i]]$Names)),
-    Labels = c(sapply(c(1:23,49:55), function(i) covarSets[[i]]$Label))
-  ),
+    Sets = c(names(dietEachConf$Names)),
+    Names = c(dietEachConf$Names),
+    Labels = as.vector(dietEachConf$Names)),
   
   dietAddConf = list(
-    Sets = c(names(covarSets)[c(1:23,56:62)]),
-    Names = c(sapply(c(1:23,56:62), function(i) covarSets[[i]]$Names)),
-    Labels = c(sapply(c(1:23,56:62), function(i) covarSets[[i]]$Label))
+    Sets = c(names(dietAddConf$Names)),
+    Names = c(dietAddConf$Names),
+    Labels = as.vector(dietAddConf$Names)),
+  
+  geneticPCs = list(
+    Sets = c(names(covarSets)[27:46]),
+    Names = c(sapply(c(27:46), function(i) covarSets[[i]]$Names)),
+    Labels = c(sapply(c(27:46), function(i) covarSets[[i]]$Label))
   )
-    
 )
   
 
@@ -191,9 +195,7 @@ diet_labels <- c(
   hotdrink_temp_hot_or_vhot_vs_warm="Prefer very/hot>warm drinks"
 )
 
-## vecors 
-#foods <- c("raw_veg", "cooked_veg", "fresh_fruit", "dried_fruit", "procmeat", "coffee")
-#names(foods) <- c("Raw vegetables", "Cooked vegetables", "Fresh fruit", "Dried fruit",  "Processed meat", "Coffee")
+## vectors 
 foods <- c("Raw vegetables"="raw_veg", "Fresh Fruit"="fresh_fruit")
 foods.l <- as.list(foods)
 
@@ -212,7 +214,7 @@ confounders <- c(
   waist2hip = "Waist-to-hip"
 )
 
-confounders_num.l <- c(
+confounders_num <- c(
   smoke_level.num = "Smoking",
   alch_freq.num = "Alcohol",
   pa_met_excess_level.num = "Physical Activity",
@@ -221,18 +223,6 @@ confounders_num.l <- c(
   bmi="BMI",
   waist2hip = "Waist-to-hip"
 )
-
-confounders.num=c(
-  "Smoking"="smoke_level.num", "Alcohol"="alch_freq.num", 
-  "Physical Activity"="pa_met_excess_level.num", 
-  "Income"="income_level.num", "Education"="educ_level.num", 
-  "BMI"="bmi", "Waist-to-hip"="waist2hip"
-  )
-
-confounder_vars.num <- c(
-  "smoke_level.num","alch_freq.num","pa_met_excess_level.num",
-  "income_level.num", "educ_level.num",
-  "bmi", "waist2hip")
 
 
 # ======================================
@@ -377,6 +367,13 @@ descr_label.fun <- function(data, base_var, labs_vals) {
 ## Descriptive "Table 1" functions
 ################################################################
 
+# ======================================
+## Load print_summary_table function
+# ======================================
+
+source("../scripts/functions/print_summary_table_fun.R", echo=F)
+
+
 # ==============================================
 ## Summary table (data format)
 # ==============================================
@@ -433,16 +430,16 @@ print_summary_table.fun <- function(pheno, vars_to_summarize) {
 }
 
 
-# =========================
+# ====================================
 ## Trait-confounder associations 
-# ==================
+# ====================================
 
 corPhenoConf.fun <- function(pheno, conf_num, adjCovar, data=dat) {
   
   if(length(adjCovar) > 1) {adjCovar =paste0(adjCovar, collapse="+")}
   
   base=summary(lm(formula(paste0(pheno, "~", conf_num)), data=dat))
-  adj <- lm(formula(paste0(pheno, "~", snp_EA, "+", gwasCovarsBase, "+", adjCovar)), data)
+  adj <- lm(formula(paste0(pheno, "~", snp_EA, "+", baseCovars, "+", adjCovar)), data)
   
   baseP=summary(baseM)$coef[2,4]
   adjP=summary(adjM)$coef[2,4]
@@ -489,14 +486,14 @@ pivot_Bdat_to_long <- function(Bchange.df) {
 ## Calculate %B change with covariate adjustment
 # =================================================
 
-pctBchange.fun <- function(pheno, snp, adjCovar, baseCovars=gwasCovarsBase, covarName=NA, data=dat) {
+pctBchange.fun <- function(pheno, snp, adjCovar, baseCovars=covarSetsBase$gwas$Covars, covarName=NA, data=dat) {
   
-  if(length(baseCovars) > 1) {baseCovars =paste0(baseCovars, collapse="+")}
+  if(length(baseCovars) > 1) {baseCovarsFormat =paste0(baseCovars, collapse="+")}
   if(length(adjCovar) > 1) {adjCovar =paste0(adjCovar, collapse="+")}
   
   snp_EA <- names(data %>% select(starts_with(snp)))
-  baseM <- lm(formula(paste0(pheno, "~", snp_EA, "+", baseCovars)), data)
-  adjM <- lm(formula(paste0(pheno, "~", snp_EA, "+", gwasCovarsBase, "+", adjCovar)), data)
+  baseM <- lm(formula(paste0(pheno, "~", snp_EA, "+", baseCovarsFormat)), data)
+  adjM <- lm(formula(paste0(pheno, "~", snp_EA, "+", baseCovarsFormat, "+", adjCovar)), data)
   
   baseP=summary(baseM)$coef[2,4]
   adjP=summary(adjM)$coef[2,4]
@@ -534,19 +531,15 @@ library("paletteer") ; library("RColorBrewer")
 #devtools::install_github("awhstin/awtools")
 
 palettes <- list(NatComms= paletteer_d("ggsci::nrc_npg", n=10),
-                 #blueteal=paletteer::paletteer_c("ggthemes::Blue-Teal", 100)[seq(1,100,4)],
-                 #orangegold=paletteer::paletteer_c("ggthemes::Orange-Gold", 100)[seq(1,100,4)],
                  classicgreen=paletteer::paletteer_c("ggthemes::Classic Green", 100)[seq(1,100,4)],
                  classicorange=paletteer::paletteer_c("ggthemes::Classic Orange", 100)[seq(1,100,4)],
-                 #confAdd=
                  greens5 = paletteer_dynamic("cartography::green.pal", 5),
                  greens = rev(paletteer_dynamic("cartography::green.pal", 10)),
                  pugr = c("#9C50CE", "#9C50CE95","#30900195", "#309001"),
-                 #oranges5 = rev(paletteer_dynamic("cartography::orange.pal", 5)),
                  oranges = rev(paletteer_dynamic("cartography::orange.pal", 10)),
-                 #blues5 = rev(paletteer_dynamic("cartography::blue.pal", 5)),
                  blues = rev(paletteer_dynamic("cartography::blue.pal", 10)),
                  purples=rev(paletteer_dynamic("cartography::purple.pal", 10))[3:10],
+                 hm_bwr = colorRampPalette(c("Blue", "White", "Red"))(1024),
                  Conf=c(brewer.pal(9,"Oranges")[4:6], brewer.pal(9, "Blues")[5:6],  
                             brewer.pal(9, "Purples")[c(8:2)]),
                             #brewer.pal(9, "PiYG")[1:3], brewer.pal(9, "PuRd")[5:6]),
@@ -559,8 +552,7 @@ palettes <- list(NatComms= paletteer_d("ggsci::nrc_npg", n=10),
                    "Education"= brewer.pal(9, "Blues")[6],
                    "BMI"=brewer.pal(9, "Purples")[8],
                    "Waist2Hip"=brewer.pal(9, "Purples")[7]),
-                 #brewer.pal(9, "PiYG")[1:3], brewer.pal(9, "PuRd")[5:6]),
-                 Confnum=c(
+                 ConfNames_num=c(
                    "smoke_level.num" = brewer.pal(9, "Oranges")[4], 
                    "alch_freq.num" = brewer.pal(9, "Oranges")[5], 
                    "pa_met_excess_level.num" = brewer.pal(9, "Oranges")[6],
@@ -578,8 +570,7 @@ palettes <- list(NatComms= paletteer_d("ggsci::nrc_npg", n=10),
                                 "Diet Pattern PC7" = brewer.pal(9, "PiYG")[2],
                                 "Diet Pattern PC8" = brewer.pal(9, "PiYG")[2],
                                 "Diet Pattern PC9" = brewer.pal(9, "PuRd")[5],
-                                "Diet Pattern PC10" = brewer.pal(9, "PuRd")[6]),
-                 hm_bwr = colorRampPalette(c("Blue", "White", "Red"))(1024)
+                                "Diet Pattern PC10" = brewer.pal(9, "PuRd")[6])
 )
 
 
@@ -588,7 +579,7 @@ palettes <- list(NatComms= paletteer_d("ggsci::nrc_npg", n=10),
 ## Build ggplot themes
 # ========================
 
-ggtheme <- theme_bw() + theme(panel.grid.minor.y = element_blank(), 
+ggtheme1 <- theme_bw() + theme(panel.grid.minor.y = element_blank(), 
                  panel.grid.minor.x = element_blank(), 
                  axis.text.x = element_text(color="black", size=8), #angle=35, hjust=1, 
                  axis.text.y = element_text(color="black", size=8),
@@ -603,23 +594,22 @@ ggtheme <- theme_bw() + theme(panel.grid.minor.y = element_blank(),
                  strip.text = element_text(face="bold", size=8)
 )
 
-
-
-ggtheme2 <- theme_bw() + theme(panel.grid.minor.y = element_blank(), 
-                              panel.grid.minor.x = element_blank(), 
-                             # panel.grid.major.y = element_blank(), 
-                              panel.grid.major.x = element_blank(),
-                              axis.text.x = element_text(color="black", size=9), #angle=35, hjust=1, 
-                              axis.text.y = element_text(color="black", size=9),
-                              axis.title = element_text(color="black", size=8, face="bold"),
-                              legend.position = "right", 
-                              legend.box.background = element_rect(color = "black"),
-                              legend.key.size = unit(0.25, 'line'),
-                              legend.margin = margin(0.2,0.2,0.2,0.2, unit="pt"),
-                              legend.text = element_text(size=8), 
-                              legend.title = element_text(face="bold", size=9),
-                              plot.title=element_text(size=9),
-                              strip.text = element_text(face="bold", size=9)
+ggtheme2 <- theme_bw() + theme(
+  panel.grid.minor.y = element_blank(), 
+  panel.grid.minor.x = element_blank(), 
+  # panel.grid.major.y = element_blank(), 
+  panel.grid.major.x = element_blank(),
+  axis.text.x = element_text(color="black", size=9), #angle=35, hjust=1, 
+  axis.text.y = element_text(color="black", size=9),
+  axis.title = element_text(color="black", size=8, face="bold"),
+  legend.position = "right", 
+  legend.box.background = element_rect(color = "black"),
+  legend.key.size = unit(0.25, 'line'),
+  legend.margin = margin(0.2,0.2,0.2,0.2, unit="pt"),
+  legend.text = element_text(size=8), 
+  legend.title = element_text(face="bold", size=9),
+  plot.title=element_text(size=9),
+  strip.text = element_text(face="bold", size=9)
 )
 
 
@@ -682,9 +672,9 @@ plot_catxcat_pct <- function(cat_var_group, cat_var_x="phenoQ", data=dat, ...) {
 }
 
 
-# =============
+# =======================================
 ## plot dietPC PVE or eigenvalues 
-# ============
+# ======================================
 
 plot_dietPC_pve.fun <- function(dPC_sdev, title) {
   as.data.frame(cbind(nPC=1:length(dPC_sdev),
@@ -709,6 +699,32 @@ plot_dietPC_egn.fun <- function(dPC_sdev, title) {
     scale_y_continuous(limits=c(0.425,2.5), breaks=seq(0.5,2.5,0.5)) +
     geom_hline(yintercept = 1, linetype="dashed", linewidth=0.35) + 
     ggtitle(title) + ggtheme2 
+}
+
+
+# =======================================
+## waterfall plot of Factor loadings
+# ======================================
+plot_dietPC.fun <- function(pheno, dietPCset, nPCs=10) {
+  as.data.frame(dietPCset) %>%
+    mutate(Diet=diet_labels[gsub("_QT", "", gsub("_BIN", "", rownames(.)))]) %>%
+    select(Diet, c(paste0("PC", 1:nPCs))) %>%
+    mutate(Diet=factor(Diet, levels=Diet[order(PC1, decreasing=T)])) %>%
+    pivot_longer(-Diet) %>% 
+    mutate(name=factor(name, levels=c(paste0("PC", 1:nPCs))),
+           dir_col = factor(case_when(
+             value <= -0.2~"Negative/Major", value > -0.2 & value <0 ~ "Negative/Minor",
+             value > 0 & value <0.2 ~"Positive/Minor", value >= 0.2 ~ "Positive/Major"),
+             levels=c("Negative/Major", "Negative/Minor", "Positive/Minor", "Positive/Major"))) %>%
+    ggplot(aes(x=value, y=Diet, fill=dir_col)) + ggtheme1 + 
+    facet_wrap(~name, nrow = 2) + geom_col() + ylab(" ") + 
+    xlab(paste("Rotated Factor Loadings")) +
+    geom_vline(xintercept = c(-0.2, 0.2), color = "black", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "black") +
+    scale_fill_manual(values=palettes$pugr, name = "Factor Loading") +
+    theme(legend.position = "bottom",
+          axis.text.y=element_text(size=10)) +
+    ggtitle(paste("PCA-deried dietary patterns without: ", diet_labels[[pheno]])) 
 }
 
 

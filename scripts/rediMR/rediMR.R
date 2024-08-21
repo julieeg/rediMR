@@ -1,5 +1,5 @@
 # ReDiMR
-# Last updated: June 12, 2024
+# Last updated: August 20, 2024
 
 
 #////////////////////////////////////////\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\#
@@ -37,21 +37,21 @@ tag <- args[2] #version "tag"
 
 pheno_tag <- paste0(pheno, "_", tag)
 
-covar <- args[3]
-ssInput <- args[4] #paste0("../data/processed/rediMR/", pheno_tag, "_ssInput.csv")
-datInput <- args[5] #paste0("../data/processed/rediMR/", pheno_tag, "_datInput.rda") 
-pctBthold <- args[6] #20
-redimrDir <- args[7]
-gwasCovars <- args[8]
+covarSet <- args[3]
+baseCovars <- args[4]
+ssInput <- args[5] #paste0("../data/processed/rediMR/", pheno_tag, "_ssInput.csv")
+datInput <- args[6] #paste0("../data/processed/rediMR/", pheno_tag, "_datInput.rda") 
+pctBthold <- args[7] #20
+redimrDir <- args[8]
 
-pheno_tag_covarSet <- paste0(pheno_tag, "_", covar)
+pheno_tag_covarSet <- paste0(pheno_tag, "_", covarSet, "_", baseCovars)
 
 
 ## Inputs & parameters
 inputs <- paste0("\n ReDiMR Inputs: \n -pheno ", pheno, "\n -tag ", tag,  
     "\n -ssInput ", ssInput, "\n -datInput ", datInput, 
-    "\n -gwasCovars ", gwasCovars,
-    "\n -covarSet ", covar, "\n -pctBthold ", pctBthold, 
+    "\n -baseCovars ", baseCovars,
+    "\n -covarSet ", covarSet, "\n -pctBthold ", pctBthold, 
     "\n -redimrDir ", redimrDir)
 
 cat(paste0(inputs))
@@ -70,8 +70,11 @@ dat<-readRDS(datInput)
 # list of snps
 snps <- names(dat %>% select(contains(ss$SNP)))
 
-# covariate sets
-covarSet <- covarSets[[covar]]
+# covariate sets for rediMR
+covarSet <- covarSets[[covarSet]]
+
+# covariates to adjust for in base models
+covarsBase <- covarSetsBase[[baseCovars]]
 
 if(length(covarSet$Names)>1) {
   cat("\n Covariates for adjustment:", covarSet$Label, "Set \n", 
@@ -97,32 +100,31 @@ cat("\n Starting Step 1: SNP Refinement ... \n ")
 
 # ================================================
 ## Adjust for ALL covariates --> SNP Refinement  
-# ================================================
+# =============================================f===
 
 cat("\n Calculating pctBchange when adjusting for ALL covariates, relative to a BASE model
-    with:", gwasCovarsBase, "... \n ")
+    with:", covarsBase$Covars , "... \n ")
 
 
 # For eacn SNP, tabulate pctBchange when adjusting for ALL covariates
 allCovars <- covarSet$Covars
 
-tabBchangeAllCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) {
+tabBchangeAll <- do.call(rbind.data.frame, mclapply(snps, function(snp) {
   pctBchange.fun(pheno=pheno, snp=snp, 
                  adjCovar=covarSet$Covars,
-                 baseCovars=gwasCovars,
+                 baseCovars=covarsBase$Covars,
                  covarName = covarSet$Label, data=dat) }, mc.cores = 8 ))
-head(tabBchangeAllCov)
-tabBchangeAllCov <- tabBchangeAllCov %>% 
+
+tabBchangeAll <- tabBchangeAll %>% 
   mutate(RefinedSet = ifelse(abs(B_pctChange) < as.numeric(pctBthold),1,0))
 
 
 # Write results to csv
-write.csv(tabBchangeAllCov, file = paste0(redimrDir, "/", pheno_tag_covarSet, "_tabBchangeAllCov.csv"), row.names=T)
+write.csv(tabBchangeAll, file = paste0(redimrDir, "/", pheno_tag_covarSet, "_tabBchangeAll.csv"), row.names=T)
 
 
-cat (paste0("DONE: Results written to ", paste0(redimrDir, "/", pheno_tag_covarSet, "_tabBchangeAllCov.csv")))
-head(tabBchangeAllCov)
-
+cat (paste0("DONE: Results written to ", paste0(redimrDir, "/", pheno_tag_covarSet, "_tabBchangeAll.csv")))
+head(tabBchangeAll)
 
 
 # =======================================================
@@ -132,18 +134,19 @@ head(tabBchangeAllCov)
 cat("Calculating pctBchange when adjusting for EACH covariate ... \n")
 
 # For each snp, tabulate pctBchange when adjusting for EACH covariate
-tabBchangeByCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) { 
+tabBchangeEach <- do.call(rbind.data.frame, mclapply(snps, function(snp) { 
   do.call(rbind.data.frame, mclapply(1:length(covarSet$Covars), function(i) {
     pctBchange.fun(pheno=pheno, snp=snp, 
                    adjCovar=covarSet$Covars[[i]], 
+                   baseCovars = covarsBase$Covars,
                    covarName=covarSet$Names[[i]], data=dat) }, mc.cores = 8))  }, mc.cores = 8))
 
 # Write results to csv
-fwrite(tabBchangeByCov, file = paste0(redimrDir, "/", pheno_tag_covarSet, "_tabBchangeByCov.csv"))
+fwrite(tabBchangeEach, file = paste0(redimrDir, "/", pheno_tag_covarSet, "_tabBchangeEach.csv"))
 
 
-cat (paste0("DONE: Results written to ", paste0(redimrDir, "/", pheno_tag_covarSet, "_tabBchangeByCov.csv")))
-head(tabBchangeByCov)
+cat (paste0("DONE: Results written to ", paste0(redimrDir, "/", pheno_tag_covarSet, "_tabBchangeEach.csv")))
+head(tabBchangeEach)
 
 
 
@@ -151,9 +154,9 @@ head(tabBchangeByCov)
 ## Make SNPset files for downstream analysis
 # =======================================================
 
-snpset <- tabBchangeAllCov %>% select(snp, RefinedSet) 
+snpset <- tabBchangeAll %>% select(snp, RefinedSet) 
 
-# rename SNPs to chr:pos format
+## rename SNPs to chr:pos format
 snpset <- snpset %>% 
   mutate(ID=gsub("snp", "", gsub("[.]", ":", gsub("_[^_]*$", "", snp)))) %>%
   rename(SNP=snp)
@@ -163,7 +166,7 @@ snpset_ss <- ss %>%
   left_join(snpset, by = "ID")
 
 
-# make snp sets
+## make snp sets
 all <- snpset_ss$ID
 refined <- (snpset_ss %>% filter(RefinedSet==1))$ID
 unrefined <- (snpset_ss %>% filter(RefinedSet==0))$ID
@@ -172,21 +175,21 @@ unrefined <- (snpset_ss %>% filter(RefinedSet==0))$ID
 ## PRS input files ==========================
 
 # All
-snpset_ss %>% 
-  select(ID, A1=EA, BETA) %>% 
-  write_tsv(file=paste0("../data/processed/prs/", pheno_tag_covarSet, "_all_prsInput"))
+#snpset_ss %>% 
+#  select(ID, A1=EA, BETA) %>% 
+#  write_tsv(file=paste0("../data/processed/prs/", pheno_tag_covarSet, "_all_prsInput"))
 
 # Refined
-snpset_ss %>% 
-  filter(RefinedSet == 1) %>% 
-  select(ID, A1=EA, BETA) %>% 
-  write_tsv(file=paste0("../data/processed/prs/", pheno_tag_covarSet, "_ref_prsInput"))
+#snpset_ss %>% 
+#  filter(RefinedSet == 1) %>% 
+#  select(ID, A1=EA, BETA) %>% 
+#  write_tsv(file=paste0("../data/processed/prs/", pheno_tag_covarSet, "_ref_prsInput"))
 
 # Unrefined
-snpset_ss %>% 
-  filter(RefinedSet == 0) %>% 
-  select(ID, A1=EA, BETA) %>% 
-  write_tsv(file=paste0("../data/processed/prs/", pheno_tag_covarSet, "_unref_prsInput"))
+#snpset_ss %>% 
+#  filter(RefinedSet == 0) %>% 
+#  select(ID, A1=EA, BETA) %>% 
+#  write_tsv(file=paste0("../data/processed/prs/", pheno_tag_covarSet, "_unref_prsInput"))
 
 
 

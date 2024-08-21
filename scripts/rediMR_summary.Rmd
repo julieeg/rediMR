@@ -4,7 +4,7 @@ output: html_document
 date: "2024-06-12"
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, error=F, message=F, out.height="60%", out.width="90%"}
 knitr::opts_chunk$set(echo=F, message=F,warning=F, 
                       fig.path="../output/")
 
@@ -25,12 +25,11 @@ mrDir="../data/processed/MR"
 # Define parameters
 tag="v2"
 foods <- c("raw_veg", "fresh_fruit")
-groups <- c("dietGroup2", "dietGroup3")
-outcome <- "dbp"
+
 ```
 
 
-```{r load-sets} 
+```{r} 
 # ==========================
 ## Load all raw_veg data 
 # ==========================
@@ -38,28 +37,24 @@ outcome <- "dbp"
 veg_tag <- paste0("raw_veg_", tag)
 
 veg_dat = readRDS(paste0(redimrDir, "/", veg_tag, "_datInput.rda"))
-veg_dPC.l <- list(
-  dietPCs = readRDS(paste0(redimrDir, "/", veg_tag, "_dietPCs.rda")),
-  dietPCsAll = readRDS(paste0(redimrDir, "/", veg_tag, "_dietPCsAll.rda"))
-)
+veg_dPCs = readRDS(paste0(redimrDir, "/", veg_tag, "_dietPCs.rda"))
 
-veg_confPheno <- lapply(groups, function(g) {
-  readRDS(paste0(redimrDir, "/", veg_tag, "_", g, "_tabConfdPheno_sexage.rda"))
-}) ; names(veg_confPheno) <- groups
-
-
-## raw_veg rediMR outputs by covariate group for dPCs
-veg_Bchange.l <- lapply(groups, function(group) {
-  g<-list(
-    BchangeAll <- lapply(covarSetGroups[[group]]$Sets, function(set) {
-      veg_tag_set <- paste0(veg_tag, "_", set)
-      list(BchangeAll <- read.csv(paste0(redimrDir, "/", veg_tag_set, "_tabBchangeAllCov.csv"))) }),
-    BchangeBy <- read.csv(paste0(redimrDir, "/", veg_tag, "_dietpctop23_tabBchangeByCov.csv"))
-    ) ; names(g) <- c("All", "By") ; names(g$All) <- covarSetGroups[[group]]$Sets
-    return(g)
-}) ; names(veg_Bchange.l) <- groups
+## raw_veg rediMR outputs by covariate group 
+veg_Bchange.l <- list(
+  All <- lapply(covarSetGroups$dietPCs$Sets, function(set) {
+    veg_tag_set <- paste0(veg_tag, "_", set)
+    list(BchangeAll <- read.csv(paste0(redimrDir, "/", veg_tag_set, "_tabBchangeAllCov.csv"))) }),
+  Each <- read.csv(paste0(redimrDir, "/", veg_tag, "_dietpctop23_tabBchangeByCov.csv")))
+names(veg_Bchange.l) <- c("All", "By") ; names(veg_Bchange.l$All) <- covarSetGroups$dietPCs$Sets
 
 
+veg_Bchange.l$All_combined <- do.call(rbind.data.frame, lapply(veg_Bchange.l$All, function(set) { 
+    set[[1]] }) ) %>%
+    mutate(nPCs=as.numeric(gsub("Top", "", gsub("DietPC.*", "", Covar)))) %>%
+    mutate(snp=gsub("snp","",gsub("[.]",":",snp)),
+           Covar=factor(Covar, levels=covarSetGroups$dietPCs$Labels)) 
+  
+  
 # raw_veg rediMR outputs for confounders
 veg_Bchange_conf.l <- list(
   BchangeAll = read.csv("../data/processed/rediMR/raw_veg_v2_stnd_tabBchangeAllCov.csv"),
@@ -74,26 +69,15 @@ veg_Bchange_conf.l <- list(
 fruit_tag <- paste0("fresh_fruit_", tag)
 
 fruit_dat = readRDS(paste0(redimrDir, "/", fruit_tag, "_datInput.rda"))
-fruit_dPC.l <- list(
-  dietPCs = readRDS(paste0(redimrDir, "/", fruit_tag, "_dietPCs.rda")),
-  dietPCsAll = readRDS(paste0(redimrDir, "/", fruit_tag, "_dietPCsAll.rda"))
-)
-
-fruit_confPheno <- lapply(groups, function(g) {
-  readRDS(paste0(redimrDir, "/", fruit_tag, "_", g, "_tabConfdPheno_sexage.rda"))
-}) ; names(fruit_confPheno) <- groups
-
+fruit_dPCs = readRDS(paste0(redimrDir, "/", fruit_tag, "_dietPCs.rda"))
 
 ## fresh_fruit rediMR outputs by covariate group 
-fruit_Bchange.l <- lapply(groups, function(group) {
-  g<-list(
-    BchangeAll <- lapply(covarSetGroups[[group]]$Sets, function(set) {
-      fruit_tag_set <- paste0(fruit_tag, "_", set)
-      list(BchangeAll <- read.csv(paste0(redimrDir, "/", fruit_tag_set, "_tabBchangeAllCov.csv"))) }),
-    BchangeBy <- read.csv(paste0(redimrDir, "/", fruit_tag, "_dietpctop23_tabBchangeByCov.csv"))
-    ) ; names(g) <- c("All", "By") ; names(g$All) <- covarSetGroups[[group]]$Sets
-    return(g)
-}) ; names(fruit_Bchange.l) <- groups
+fruit_Bchange.l <- list(
+  All <- lapply(covarSetGroups$dietPCs$Sets, function(set) {
+    fruit_tag_set <- paste0(fruit_tag, "_", set)
+    list(BchangeAll <- read.csv(paste0(redimrDir, "/", fruit_tag_set, "_tabBchangeAllCov.csv"))) }),
+  Each <- read.csv(paste0(redimrDir, "/", fruit_tag, "_dietpctop23_tabBchangeByCov.csv")))
+names(fruit_Bchange.l) <- c("All", "By") ; names(fruit_Bchange.l$All) <- covarSetGroups$dietPCs$Sets
 
 
 # fresh_fruit rediMR outputs for confounders
@@ -114,122 +98,58 @@ fruit_Bchange_conf.l <- list(
 
 # Adjusting for ALL dietPCs PLUS EACH behavioral/SES confounders
 veg_BchangeEachConf <- readRDS("../data/processed/rediMR/veg_BchangeEachConf.rda")
-
-# Adjusting for ALL dietPCs PLUS ADDITIONAL behavioral/SES confounders
 veg_BchangeAddConf <- readRDS("../data/processed/rediMR/veg_BchangeAddConf.rda")
 
 
+# Adjusting for ALL dietPCs PLUS ADDITIONAL behavioral/SES confounders
 veg_Bdat.l <- list(
-  each_dPC = veg_Bchange.l$dietGroup2$By,
+  each_dPC = veg_Bchange.l$By,
   each_conf = veg_Bchange_conf.l$BchangeBy,
-  each_allvars = rbind.data.frame(veg_Bchange.l$dietGroup2$By, veg_Bchange_conf.l$BchangeBy),
-  each_dPCplusconf = do.call(rbind.data.frame, veg_BchangeEachConf),
-  all_dPCs = veg_Bchange.l$dietGroup2$All$dietpctop23[[1]] %>% select(-c("X", "RefinedSet")),
+  each_allvars = rbind.data.frame(veg_Bchange.l$By, veg_Bchange_conf.l$BchangeBy),
+  each_dPCplusConf = do.call(rbind.data.frame, veg_BchangeEachConf),
+  all_dPCs = veg_Bchange.l$All$dietpctop23[[1]] %>% select(-c("X", "RefinedSet")),
   all_conf = veg_Bchange_conf.l$BchangeAll %>% select(-c("X", "RefinedSet")),
-  all_allvars = rbind.data.frame(veg_Bchange.l$dietGroup2$All$dietpctop23[[1]], veg_Bchange_conf.l$BchangeAll),
-  all_dPCplusconf = do.call(rbind.data.frame, veg_BchangeAddConf)
-)
-
-
-fruit_Bdat_each.l <- list(
-  dPC = fruit_Bchange.l$dietGroup2$By,
-  conf = fruit_Bchange_conf.l$BchangeBy,
-  all = rbind.data.frame(fruit_Bchange.l$dietGroup2$By, fruit_Bchange_conf.l$BchangeBy)
+  all_allvars = rbind.data.frame(veg_Bchange.l$All$dietpctop23[[1]], veg_Bchange_conf.l$BchangeAll),
+  all_dPCplusConf = do.call(rbind.data.frame, veg_BchangeAddConf)
 )
 
 ```
 
-## First, we examined the characteristics of diet PCs (derived without and with the diet trait)
+#### Check characteristics of diet PCs (derived without the diet trait)
 
-```{r plot-dietPCs, fig.asp=0.75, out.width="95%"}
+```{r}
 
 # ========
 ## PVE
 # ========
 
 ggarrange(
-  plot_dietPC_pve.fun(veg_dPC.l$dietPCs$sdev, "dietPCs without raw vegetable"),
-  plot_dietPC_pve.fun(fruit_dPC.l$dietPCs$sdev, "diet PCs without fresh fruit"),
-  plot_dietPC_pve.fun(veg_dPC.l$dietPCsAll$sdev, "diet PCs with all diet traits"),
-  nrow=1, ncol=3) %>%
-  ggsave(filename=paste0("../output/plot_dietPCs_pve.pdf"), height = 5, width = 15)
-
-
-# ================
-## Eigenvalues
-# ================
-
-ggarrange(
-  plot_dietPC_egn.fun(veg_dPC.l$dietPCs$sdev, "dietPCs without raw vegetable"),
-  plot_dietPC_egn.fun(fruit_dPC.l$dietPCs$sdev, "diet PCs without fresh fruit"),
-  plot_dietPC_egn.fun(veg_dPC.l$dietPCsAll$sdev, "diet PCs with all diet traits"),
-  nrow=1, ncol=3) %>%
-  ggsave(filename=paste0("../output/plot_dietPCs_egn.pdf"), height = 5, width = 15)
+  plot_dietPC_pve.fun(veg_dPCs$sdev, "dietPCs without raw vegetable"),
+  plot_dietPC_pve.fun(fruit_dPCs$sdev, "dietPCs without fruit intake"))
 
 ```
 
 
-```{r plot-loadings, fig.asp=0.75, out.width="95%"}
+```{r}
 
-## waterfall plot of Factor loadings
-plot_dietPC.fun <- function(pheno, dietPCset, nPCs=10) {
-  as.data.frame(dietPCset) %>%
-    mutate(Diet=diet_labels[gsub("_QT", "", gsub("_BIN", "", rownames(.)))]) %>%
-    select(Diet, c(paste0("PC", 1:nPCs))) %>%
-    mutate(Diet=factor(Diet, levels=Diet[order(PC1, decreasing=T)])) %>%
-    pivot_longer(-Diet) %>% 
-    mutate(name=factor(name, levels=c(paste0("PC", 1:nPCs))),
-           dir_col = factor(case_when(
-             value <= -0.2~"Negative/Major", value > -0.2 & value <0 ~ "Negative/Minor",
-             value > 0 & value <0.2 ~"Positive/Minor", value >= 0.2 ~ "Positive/Major"),
-             levels=c("Negative/Major", "Negative/Minor", "Positive/Minor", "Positive/Major"))) %>%
-    ggplot(aes(x=value, y=Diet, fill=dir_col)) + ggtheme + 
-    facet_wrap(~name, nrow = 2) + geom_col() + ylab(" ") + 
-    xlab(paste("Rotated Factor Loadings")) +
-    geom_vline(xintercept = c(-0.2, 0.2), color = "black", linetype = "dashed") +
-    geom_vline(xintercept = 0, color = "black") +
-    scale_fill_manual(values=palettes$pugr, name = "Factor Loading") +
-    theme(legend.position = "bottom",
-          axis.text.y=element_text(size=10)) +
-    ggtitle(paste("PCA-deried dietary patterns without: ", diet_labels[[pheno]])) 
-}
-
-
-# =============================
 ## Raw vegetables - dietPCs
-# =============================
+plot_dietPC.fun("raw_veg", veg_dPCs$rotation, 10) #%>%
+  #ggsave(filename="../output/p_veg_dietPCs_dietGroup2.pdf", height=10, width=20)
 
-plot_dietPC.fun("raw_veg", veg_dPC.l$dietPCs$rotation, 23) %>%
-  ggsave(filename="../output/p_veg_dietPCs_dietGroup2.pdf", height=10, width=20)
-
-# =============================
 ## Fresh fruit - dietPCs
-# =============================
-
-plot_dietPC.fun("fresh_fruit", fruit_dPC.l$dietPCs$rotation , 23) %>%
-  ggsave(filename="../output/p_fruit_dietPCs_dietGroup2.pdf", height=10, width=20)
-
-
-# ============================
-## All diet variables 
-# ============================
-
-plot_dietPC.fun("raw_veg", veg_dPC.l$dietPCsAll$rotation, 24) %>%
-  ggsave(filename="../output/p_veg_dietPCs_dietGroup3.pdf", height=10, width=20)
-
+#plot_dietPC.fun("fresh_fruit", fruit_dPCs$rotation , 10) #%>%
+  #ggsave(filename="../output/p_fruit_dietPCs_dietGroup2.pdf", height=10, width=20)
 
 ```
 
-## Then we checked our assumptions that:
-# (1a) Diet (specific traits & diet patterns) associate with behavioral, SES and biological confounders.
-# (1b) Phenotypic diet-confounder associations are attenuated, after adjusting for dietPCs
+Checked assumptions:
+-Diet (specific traits & diet patterns) associate with behavioral, SES and biological confounders.
+-Phenotypic diet-confounder associations are attenuated, after adjusting for dietPCs
 
-##### (1a) Diet (specific traits & diet patterns) associate with behavioral, SES and biological confounders.
 
-```{r cor}
+```{r}
 
 library(gplots)
-
 veg_cormat <- readRDS("../data/processed/plots/raw_veg_v2_dietGroup2_plotHMconf.rda")
 veg_cormat_dG2 <- veg_cormat[c("raw_veg", covarSets$dietpctop23$Covars),-1]
 
@@ -251,62 +171,43 @@ heatmap.2(t(veg_cormat_dG2[c("raw_veg", covarSets$dietpctop23$Covars),]),
 # ===============
 
 # Create correlations matrix of all dietPCs with confounders
-fruit_cormat <- readRDS("../data/processed/plots/fresh_fruit_v2_dietGroup2_plotHMconf.rda")
-fruit_cormat_dG2 <- fruit_cormat[c("fresh_fruit", covarSets$dietpctop23$Covars),-1]
-
-#dietGroup2
+#fruit_cormat <- readRDS("../data/processed/plots/fresh_fruit_v2_dietGroup2_plotHMconf.rda")
+#fruit_cormat_dG2 <- fruit_cormat[c("fresh_fruit", covarSets$dietpctop23$Covars),-1]
 
 #pdf(paste0("../output/", fruit_tag, "_plotHMconf_dietGroup2.pdf"), height=4, width=7)
-heatmap.2(t(fruit_cormat_dG2[c("fresh_fruit", covarSets$dietpctop23$Covars),]),
-          col = palettes$hm_bwr,
-          margins = c(8,8), #key="False",
-          Rowv=T, Colv=F, 
-          colsep = 1, 
-          offsetCol = 0, offsetRow = 0, #lhei=c(1,5), lwid = c(1,6),
-          linecol =  "black",
-          density.info = "none", trace = "none", dendrogram = "none",
-          cexRow = 0.75, cexCol = 0.75)
-#dev.off()
-
-
-# ==================
-## All diet traits
-# ==================
-
-#dietGroup3
-all_cormat_dG3 <- veg_cormat[covarSets$dietpctop24all$Covars,]
-#pdf(paste0("../output/","veg&fruit_v2", "_plotHMconf_dietGroup3.pdf"), height=4, width=7.5)
-heatmap.2(t(all_cormat_dG3[covarSets$dietpctop24all$Covars,-1]),
-          col = palettes$hm_bwr,
-         #scale="row", 
-          margins = c(5,6), #key="False",
-          Rowv=T, Colv=F, 
-          offsetCol = 0, offsetRow = 0, #lhei=c(1,5), lwid = c(1,6),
-          linecol =  "black",
-          density.info = "none", trace = "none", dendrogram = "none",
-          cexRow = 0.85, cexCol = 0.75)
+#heatmap.2(t(fruit_cormat_dG2[c("fresh_fruit", covarSets$dietpctop23$Covars),]),
+#          col = palettes$hm_bwr,
+#          margins = c(8,8), #key="False",
+#          Rowv=T, Colv=F, 
+#          colsep = 1, 
+#          offsetCol = 0, offsetRow = 0, #lhei=c(1,5), lwid = c(1,6),
+#          linecol =  "black",
+#          density.info = "none", trace = "none", dendrogram = "none",
+#          cexRow = 0.75, cexCol = 0.75)
 #dev.off()
 
 ```
 
+* Note: Not depicted, is an analyses of phenotypic correlations of diet-confounder associations: We saw that adjusting for dPCs attenuates the associations modestly, although not completely, suggesting there are unmeasured confounders or mediators.
 
-In analysis of phenotypic correlations of diet-confounder associations, adjusting for dPCs attenuates the associations modestly, although not completely, suggesting there are unmeasured confounders or mediators; 
 
-## Examine the effect of adjusting for diet PCs on SNP-diet associations 
-#### Focus on magnitude (%) change in Beta coefficients
+### Examine the effect of diet PC adjustment on causal effect estimates for variant-Food intake associations 
+#### Examine the magnitude (%) change in Beta coefficients with dietPC adjustment
 
-```{r plot-rediMR-Bchange}
+```{r}
 
 # ==========================================================================
 ## Dot plot BETA (% change) when adjusting for EACH covariate
 ### Confounders and dietPCs
 # ==========================================================================
 
-plot_Bchange_dPCconf.fun <- function(Bdat_vars, food, varset) {
+plot_Bchange.fun <- function(Bchange, food, covars) {
   
-  tab <- Bdat_vars %>%
+  tab <- Bchange %>%
     pivot_Bdat_to_long() %>%
-    mutate(Covar = factor(Covar, levels=c("Unadjusted","DietPCs", covarSets$stnd$Names, "All non-DietPC \nConfounders", covarSets$dietpctop23$Names)))
+    mutate(Covar = factor(Covar, levels=c("Unadjusted", "DietPCs", 
+                                          covarSets$confounders$Names, "All non-DietPC \nConfounders", 
+                                          covarSets$dietpctop23$Names)))
   
   yscale <- ceiling(max(abs(tab$B_pctChange))*1.05)
   
@@ -314,11 +215,11 @@ plot_Bchange_dPCconf.fun <- function(Bdat_vars, food, varset) {
     food_colors = rev(palettes$classicgreen)
     } else { food_colors = rev(palettes$classicorange) }
   
-  if(varset == "all") {
+  if(covars == "all") {
     plot_colors = c(palettes$Conf[1:7], food_colors)
-  } else if(varset == "dPCs") {
+  } else if(covars == "dPCs") {
     plot_colors = food_colors
-  } else if (varset =="conf") {
+  } else if (covars =="conf") {
     plot_colors = c(food_colors[1], palettes$Conf[1:7], "grey38")
   }
 
@@ -347,30 +248,27 @@ veg_Bchange.df <- rbind.data.frame(
   veg_Bdat.l$all_conf %>% mutate(Covar=gsub("Standard", "All non-DietPC \nConfounders", Covar)),
   veg_Bdat.l$all_dPCs %>% mutate(Covar=gsub("Top23DietPCs", "DietPCs", Covar)))
 
-plot_Bchange_conf <- plot_Bchange_dPCconf.fun(veg_Bchange.df, "raw_veg", varset="conf") 
+plot_Bchange_conf <- plot_Bchange.fun(veg_Bchange.df, "raw_veg", covars = "conf") 
+
 #plot_Bchange_conf %>%  ggsave(filename = "../output/plot_raw_veg_v2_Bchange_conf.pdf", height = 4, width=5)
+plot_Bchange_conf
 
 ```
 
 In the plots of magnitude (%) Beta change after adjusting for hypothesized confounders/mediators, we see most substantial impact on Betas when adjusting for INCOME relative to other behavioral/lifestyle traits.
 
 
-## Examine the effect of adjusting for diet PCs on SNP-diet associations 
-#### Focus on adjusted Beta coefficients
+##### Examine the adjusted Beta coefficients after dietPC adjustment 
+Diet PCs were progressively introduced into the model and the resulting beta (5% CI) were plotted
 
 ```{r fn-rediMR-adjB, fig.asp=0.55}
-
 # ==========================================================================
 ## Function to plot BETA (adjusted) when ADDING adjustment for all dietPCs
 # ==========================================================================
 
 # Dot plot of pctBchange when adjusting for ALL covariates
-plot_adjB_dPCall.fun<-function(food, Bchange, group, covarsets, PCs_to_plot="all") {
-  tab_all <- do.call(rbind.data.frame, lapply(covarsets, function(set) { 
-    Bchange[[set]][[1]] }) ) %>%
-    mutate(nPCs=as.numeric(gsub("Top", "", gsub("DietPC.*", "", Covar)))) %>%
-    mutate(snp=gsub("snp","",gsub("[.]",":",snp)),
-           Covar=factor(Covar, levels=covarSetGroups[[group]]$Labels)) %>%
+plot_adjB_dPCall.fun<-function(food, Bchange, PCs_to_plot="all") {
+  tab_all <- veg_Bchange.l$All_combined %>%
     pivot_longer(c(ends_with("base"), ends_with("adj")), names_to=c("stat", "mod"), names_sep="_") %>%
     pivot_wider(names_from="stat", values_from = value) %>%
     mutate(nPCs = ifelse(mod == "base", 0, nPCs)) %>%
@@ -414,23 +312,24 @@ plot_adjB_dPCall.fun<-function(food, Bchange, group, covarsets, PCs_to_plot="all
 ## Print & save plots 
 # ======================
 
-plot_adjB_dPC <- plot_adjB_dPCall.fun("raw_veg", veg_Bchange.l$dietGroup2$All, "dietGroup2", covarSetGroups$dietGroup2$Sets) 
-#plot_adjB_dPC %>% ggsave(filename="../output/raw_veg_v2_plot_adjB_dPCall.pdf", height = 4, width =6)
+plot_adjB_dPC <- plot_adjB_dPCall.fun("raw_veg", veg_Bchange.l$All_combined) 
 
+#plot_adjB_dPC %>% ggsave(filename="../output/raw_veg_v2_plot_adjB_dPCall.pdf", height = 4, width =6)
+plot_adjB_dPC
 ```
 
+#### Focus on adjusted Beta coefficients for each confounder, in referent models either without (Base GWAS covariates) or with (DietPCs) prior adjustment for diet PCs
 
-
-```{r, fig.width=10, fig.height=4, fig.asp=0.55}
+```{r}
 
 # ====================================
 # Plot Absolute changes in Beta
 # ====================================
 
 tab_Bchange_forPlot <- rbind.data.frame(
-  veg_Bdat.l$each_conf, veg_Bdat.l$each_dPCplusconf, 
+  veg_Bdat.l$each_conf, veg_Bdat.l$each_dPCplusConf, 
   veg_Bdat.l$all_dPCs, veg_Bdat.l$all_conf,
-  veg_Bdat.l$all_dPCplusconf %>% filter(Covar =="DietPCs_Add7cWaist2Hip")) %>% 
+  veg_Bdat.l$all_dPCplusConf %>% filter(Covar =="DietPCs_Add7cWaist2Hip")) %>% 
   left_join(veg_Bdat.l$all_dPCs %>% select(c("snp", B_dPC="B_adj")), by = "snp") %>%
   mutate(B_diff=B_adj-B_base) %>%
   pivot_Bdat_to_long() %>%
@@ -471,10 +370,11 @@ plot_Bchange_abs_compare #%>% ggsave(filename="../output/raw_veg_v2_plot_panel_F
 
 ```
 
-## Plot individul SNP examples
+### Pull out individual SNP examples where hypothesis is supported and not
+
+First, focus on Income associations given the apparent heterogeneity in variant-diet associations
 
 ```{r}
-
 # Focusing on Income and PA, which had most evidence of confounding based on change-in-estimate analysis;
 # Visualizing the SNPs for which adjusting for Covariates ON TOP of dietPCs had the LEAST impact on effect estimates
 # and the MOST impact on effect estimates
@@ -526,20 +426,20 @@ plot_snp_adjB.fun <- function(variant, covar, with_labels=F) {
      # theme(text = element_text(face="bold", size=8))
   }
   return(p)
-  }
+}
+
 ```
 
+Then, expand to looking across all confounders
 
-```{r }
-
-# Visualize extremes: 
+```{r}
+# Gather SNP extremes: 
 tab_Bchange_forSingleSNPs <- tab_Bchange_forPlot %>% 
   select(snp, Covar_cat, B_diff, B, Reference_Model, B_pctChange) %>%
   pivot_wider(values_from=c("B_diff"), names_from = "Reference_Model", id_cols = c(snp, Covar_cat)) %>%
   mutate(diff_of_diff = DietPC-Base, dietpc_to_base = DietPC/Base) %>% arrange(abs(dietpc_to_base))
 
-tab_Bchange_forSingleSNPs %>% 
-  filter(Covar_cat %in% c("Income"))
+#tab_Bchange_forSingleSNPs %>% filter(Covar_cat %in% c("Income"))
 
 ## Comparing (RELATIVE) changes in DietPC model to changes in Base model:
 # SMALLEST change in DietPC relative to Base model: rs7834671_G (Income) ; rs67497633_G (PA)
@@ -548,7 +448,7 @@ p_snpxinc_supp_rs761 <- plot_snp_adjB.fun("rs7619139_T", "Income") #; plot_snp_a
 #p_snpxpa_supp <- plot_snp_adjB.fun("rs67497633_G", "Phys Act") #; plot_snp_adjB.fun("rs3828120_T", "Phys Act")
 
 ## Comparing (ABSOLUTE) change in dietPC model to change in Base model:
-tab_Bchange_forSingleSNPs %>% filter(Covar_cat %in% c("Income", "Phys Act")) %>% arrange(DietPC)
+#tab_Bchange_forSingleSNPs %>% filter(Covar_cat %in% c("Income", "Phys Act")) %>% arrange(DietPC)
 
 # LARGEST residual change in dietPC model
 p_snpxinc_not_rs114 <- plot_snp_adjB.fun("rs114595701_C", "Income", with_labels = T)
@@ -558,22 +458,18 @@ plot_Bchange_snps <- ggarrange(
   ggarrange(p_snpxinc_supp_rs783, p_snpxinc_supp_rs761, ncol=2), "",
   ggarrange(p_snpxinc_not_rs114, p_snpxinc_not_rs775, ncol=2),
   ncol=3, widths = c(1, 0.1, 1))
+
+plot_Bchange_snps
 ```
 
-
-
-```{r}
-
+```{r, include=F}
 # ====================================
-# EXTR PLOTS 
+# Combined panel plot
 # ====================================
-
 ggarrange(
   ggarrange(plot_adjB_dPC, "", plot_Bchange_conf, ncol=3, nrow=1, align="hv", widths=c(1.5, 0.05, 1)),
   plot_Bchange_abs_compare, plot_Bchange_snps,
-  ncol=1, nrow=3) %>% 
-  ggsave(filename="../output/raw_veg_v2_plot_panel_Fig2_v3.pdf", height=8 , width=10)
-
+  ncol=1, nrow=3) #%>% ggsave(filename="../output/raw_veg_v2_plot_panel_Fig2_v3.pdf", height=8 , width=10)
 
 # ===================================================
 ## SNPs with the most and least DIETPC confounding
@@ -589,23 +485,25 @@ snps_least_dPC_conf <- c("rs11209780_G", "rs67497633_G")
 
 tab_Bchange_forPlot %>% filter(snp %in% c(snps_most_dPC_conf, snps_least_dPC_conf)) %>%
   filter(Reference_Model == "DietPC" | Covar == "Unadjusted" | Covar == "DietPCs") %>%
-  ggplot(aes(y=B, ymin=lowCI, ymax=upCI, x=snp, group=Covar, color=Covar_cat, shape=snp)) + 
+  ggplot(aes(y=B, ymin=lowCI, ymax=upCI, x=snp, group=Covar, color=Covar_cat)) + 
   geom_point(size=2.55, position=position_dodge(0.65)) + #geom_line() + 
   geom_errorbar(width=0.55, position=position_dodge(0.65)) + #geom_line() + 
-  scale_color_manual(values=palettes$ConfNames) + 
+  scale_color_manual(values=c(palettes$ConfNames, "DietPCs"=palettes$classicgreen[15],
+                              "All non-DietPC\nConfounders"="brown")) + 
   geom_hline(yintercept = 0) + 
   ggtheme2 + 
-  theme(axis.text.x=element_text(angle=35, hjust=1))
+  ylab("Beta (95% CI)") +
+  theme(axis.text.x=element_text(angle=15, hjust=0.5, vjust=0.5))
   
 
 ```
 
 
 
-```{r tab-Badj-conf }
+```{r, include=F}
 
 veg_Bdat.l$each_allvars %>% 
-  filter(Covar %in% c("Diet Pattern PC23", covarSets$stnd$Names)) %>%
+  filter(Covar %in% c("Diet Pattern PC23", covarSets$confounders$Names)) %>%
   mutate(snp=gsub("snp","",gsub("[.]",":",snp))) %>%
   mutate(across(is.numeric, ~round(., 4))) %>%
   mutate(Raw_B.SE = sprintf("%s (%s)", B_base, SE_base),
@@ -613,31 +511,21 @@ veg_Bdat.l$each_allvars %>%
   select(snp, Covar, Raw_B.SE, Conf_B.SE) %>%
   pivot_wider(values_from = c("Raw_B.SE", "Conf_B.SE"), names_from="Covar") %>%
   rename("Unadjusted_B.SE" = "Raw_B.SE_Smoking") %>%
-  select(-starts_with("Raw")) %>%
-  write.csv("../output/raw_veg_v2_tab_BadjbyConf.csv")
+  select(-starts_with("Raw")) #%>%
+  #write.csv("../output/raw_veg_v2_tab_BadjbyConf.csv")
 
 
 ## Take variants that change at the extremes
-veg_Bchange.l$dietGroup2$All$dietpctop23[[1]] %>% arrange(B_pctChange)
+veg_Bchange.l$All$dietpctop23[[1]] %>% arrange(B_pctChange)
 veg_snps_extreme <- c("rs1269454_G", "rs2941732_A", "snp2.104130139_AT_A_AT", "rs3096690_G", "rs11209780_G", "rs67497633_G")
 
-fruit_Bchange.l$dietGroup2$All$dietpctop23[[1]] %>% arrange(B_pctChange)
+fruit_Bchange.l$All$dietpctop23[[1]] %>% arrange(B_pctChange)
 fruit_snps_extreme <- c("rs429358_T", "rs62106258_T", "rs35628463_G", "rs2081194_G", "rs1052486_A", "rs144893360_T")
 
 ```
 
 
-First main result: adjusting for diet PCs attenuated all SNP-diet associations, but not to 0, indicating (1) remaining/unmeasured confounders/mediators explaining SNP-diet relations, or (2) possible direct effects of the SNP on diet, not explained by behavioral/lifestyle confounding or mediation.
-
-We then compared the effects of dPC adjustment to confounder adjusment. We hypothesized that adjusting for each confounder will attenuate the associations to a modest degree; and that adjusting for an appropriate amount of dPCs will attenuate the associations to a greater degree, representing correction for behaviora/lifestyle confounders. 
-
-
-
-## Summarize table of adjusted Beta and % change upon adjustment when ADDING confounders
-
-### Zoom in on specific SNPs changing MOST and LEAST upon diet PC adjustment
-
-```{r}
+```{r, include=F}
 # ========================================================================
 ## ZOOMED IN plot of BETA (adjusted) when adjusting for each CONFOUNDER
 # ========================================================================
@@ -651,11 +539,11 @@ plot_adjB_confZoom.fun <- function(Bdat.l, snp_extremes) {
     pivot_wider(names_from="stat", values_from = value) %>%
     mutate(Covar = ifelse(Covar == "Smoking" & mod == "base", "Unadjusted", 
                           ifelse(Covar == "Standard", "All_Confounders", 
-                                 ifelse(Covar == "DietPCs_Add7cWaist2Hip", "Top23DietPCs & All_Confounders", Covar))),
+                                 ifelse(Covar == "DietPCs_Add7cWaist2Hip", "DietPCs + All Confounders", Covar))),
            snp=gsub("snp","",gsub("[.]",":", snp))) %>%
     filter(Covar == "Unadjusted" | mod == "adj") %>% 
-    mutate(Covar = factor(Covar, levels=c("Unadjusted", covarSets$stnd$Names, 
-                                          "All_Confounders", "Top23DietPCs", "Top23DietPCs & All_Confounders"))) %>%
+    mutate(Covar = factor(Covar, levels=c("Unadjusted", covarSets$confounders$Names, 
+                                          "All_Confounders", "DietPCs", "DietPCs + All Confounders"))) %>%
     mutate(B_pctChange = ifelse(Covar == "Unadjusted", 0, B_pctChange)) 
   
   yscale<-c(min(tab$lowCI)*1.05, max(tab$upCI)*1.05)
@@ -670,7 +558,7 @@ plot_adjB_confZoom.fun <- function(Bdat.l, snp_extremes) {
     geom_errorbar(width=0.55, position=position_dodge(0.65), alpha=0.95, linewidth=0.35) + 
     geom_hline(yintercept = 0, color = "black", linetype = "dashed") + 
     scale_y_continuous(limits=c(yscale[1], yscale[2])) +
-    scale_color_manual(values =  c("black", palettes$Conf[1:7], "brown", 
+    scale_color_manual(values =  c("black", palettes$ConfNames[1:7], "brown", 
                                    rev(palettes$classicgreen)[1], "darkgrey"), name = "Adjustments") +
     ylab("Beta (95% CI)") + xlab(" ") 
 }
@@ -682,15 +570,11 @@ plot_adjB_confZoom.fun(veg_Bchange_conf.l, veg_snps_extreme)
 
 ```{r, width=12}
 
-# ========================================================================
-## ZOOMED IN plot of BETA (adjusted) when adjusting for each CONFOUNDER
-# ========================================================================
-
 plot_adjB_confZoom2.fun <- function(Bdat.l, BchangeEachConf, snp_extremes) {
   
   tab <- rbind.data.frame(Bdat.l$each_conf, Bdat.l$all_dPCs, Bdat.l$all_conf, 
                           do.call(rbind.data.frame, BchangeEachConf) %>%
-                            mutate(Covar=rep(paste0("DietPCs+", covarSets$stnd$Names), each=length(unique(snp)) )) 
+                            mutate(Covar=rep(paste0("DietPCs+", covarSets$confounders$Names), each=length(unique(snp)) )) 
                           ) %>%
     filter(snp %in% veg_snps_extreme) %>%
     pivot_longer(c(ends_with("base"), ends_with("adj")), names_to=c("stat", "mod"), names_sep="_") %>%
@@ -698,10 +582,11 @@ plot_adjB_confZoom2.fun <- function(Bdat.l, BchangeEachConf, snp_extremes) {
     mutate(Covar = ifelse(Covar == "Smoking" & mod == "base", "Unadjusted", 
                           ifelse(Covar == "Standard", "Confounders", Covar)),
            snp=gsub("snp","",gsub("[.]",":", snp))) %>%
+    mutate(ifelse(is.na(Covar)==T, "Waist2Hip", Covar)) %>%
     filter(Covar == "Unadjusted" | mod == "adj") %>% 
     mutate(B_pctChange = ifelse(Covar == "Unadjusted", 0, B_pctChange)) %>%
     mutate(Covar2=factor(ifelse(Covar == "Top23DietPCs", "DietPCs", Covar),
-                         levels=c("Unadjusted", covarSets$stnd$Names, "Confounders", "DietPCs", paste0("DietPCs+", covarSets$stnd$Names)))
+                         levels=c("Unadjusted", covarSets$confounders$Names, "Confounders", "DietPCs", paste0("DietPCs+", covarSets$confounders$Names)))
            )
 
   yscale<-c(min(tab$lowCI)*1.05, max(tab$upCI)*1.05)
@@ -726,252 +611,10 @@ plot_adjB_confZoom2.fun(veg_Bdat.l, veg_BchangeEachConf, veg_snps_extreme)
 ```
 
 
-```{r, height=6, width=14}
+##### Summary:
+- Note: adjusting for diet PCs attenuated all SNP-diet associations, but not to 0, indicating (1) remaining/unmeasured confounders/mediators explaining SNP-diet relations, or (2) possible direct effects of the SNP on diet, not explained by behavioral/lifestyle confounding or mediation.
 
-# ===============
-## SNP plots 
-# ================
-
-## Calculate %change in Beta from base+dietPC model for each confounder
-
-plot_adjB_snp.fun <- function(plot_snp, Conf, food="raw_veg", Bdat.l=veg_Bdat.l){
-  Conf="Income"
-  adjCovarSet = covarSets[[paste0("dietpcsAnd", confounder_pref[[Conf]])]]
-  
-  tab_comp <- rbind.data.frame(Bdat.l$each_conf, Bdat.l$each_dPCplusconf, Bdat.l$all_dPCs) %>%
-    pivot_Bdat_to_long() %>%
-    mutate(Covar = factor(Covar, levels=c("Unadjusted", Conf, "DietPCs", adjCovarSet)))
-
-  tab_comp %>% 
-    filter(complete.cases(.)) %>%
-    filter(snp == plot_snp) %>%
-    ggplot(aes(x=Covar, y=B, ymin=lowCI, ymax=upCI, color=Covar)) +
-    geom_point(size=1.75) + 
-    geom_errorbar(width=0.5) +
-    geom_hline(yintercept = 0)
-}
-
-plot_adjB_snp.fun(veg_snp, "Income")
-
-
-plot_Bchange_snp.fun <- function(plot_snp, Conf, food="raw_veg", Bdat.l=veg_Bdat.l){
-  Conf="Income"
-  adjCovarSet = covarSets[[paste0("dietpcsAnd", confounder_pref[[Conf]])]]
-  
-  tab_comp <- rbind.data.frame(Bdat.l$each_conf, Bdat.l$each_dPCplusconf, Bdat.l$all_dPCs) %>%
-    pivot_Bdat_to_long() %>%
-    mutate(Covar = factor(Covar, levels=c("Unadjusted", Conf, "DietPCs", adjCovarSet)))
-
-  tab_comp %>% 
-    filter(complete.cases(.)) %>%
-    #filter(snp == plot_snp) %>%
-    ggplot(aes(x=Covar, y=B_pctChange, group=snp, color=Covar)) +
-    #geom_bar(stat="identity")+
-    geom_point(size=1.75) + 
-    geom_line(linewidth=0.15) +
-    geom_hline(yintercept = 0)
-}
-
-plot_Bchange_snp.fun(veg_snp, "Income")
-
-ggarrange(plot_adjB_snp.fun(rs1269454_income, "Income"),
-          plot_adjB_snp.fun(rs2941732_income, "Income"),
-          plot_adjB_snp.fun(rs11209780_income, "Income"),
-          plot_adjB_snp.fun(rs3096690_income, "Income"))
-
-
-ggarrange(
-  plot_adjB_snp.fun(rs1269454_income, "Income"),
-  plot_adjB_snp.fun(rs1248825_income, "Income"),
-  plot_adjB_snp.fun(rs114595701_income, "Income"),
-  plot_adjB_snp.fun(rs3131010_income, "Income")
-)
-  
-  
-```
-
-
-#### Examine impact of adjusting for additional lifestyle/SES covariates on SNP-diet associations
-
-```{r rediMR-dietPC-conf }
-
-# ======================================================
-## Dot plots with EACH additional confounder adjustments
-# ======================================================
-
-plot_adjB_dietConf.fun<-function(food, food_Bchange.l, food_BchangeEachConf) {
-
-rbind.data.frame(
-  do.call(rbind.data.frame, lapply(covarSetGroups$dietGroup2$Sets, function(set) { 
-    food_Bchange.l$dietGroup2$All[[set]][[1]] }) ) %>% select(-"RefinedSet"),
-  
-  do.call(rbind.data.frame, food_BchangeEachConf) %>%
-    mutate(X=rownames(.), .before="snp")) %>%   
-    mutate(snp=gsub("snp","",gsub("[.]",":",snp)),
-           Covar=factor(Covar, levels=c(covarSetGroups$dietEachConf$Labels))) %>%
-    pivot_longer(c(ends_with("base"), ends_with("adj")), names_to=c("stat", "mod"), names_sep="_") %>%
-    pivot_wider(names_from="stat", values_from = value) %>%
-    filter((Covar=="Top1DietPCs" & mod == "base") | mod == "adj") %>%
-  
-  ggplot(aes(x=Covar, y = B, group=snp, color = Covar)) +
-  theme_bw() + ggtheme2 + 
-  theme(axis.text.x = element_text(angle=90), legend.position = "none") +
-  geom_hline(yintercept = 0, color = "black") + 
-  geom_point(size=1, alpha=0.75) +
-  geom_line(linewidth=0.15) +
-  scale_color_manual(values=c(palettes$classicgreen[1:23], palettes$Conf)) +
-  ylab("adjusted Beta (95% CI) ") + 
-  xlab("Confounder adjustment")
-}
-
-plot_adjB_dietConf.fun("raw_veg", veg_Bchange.l, veg_BchangeEachConf)
-
-```
-
-##### Next, we ran a series of MR analyses for [each of 8 outcomes] using genetic instruments for DIET traits constructed from GWAS-significant loci, progressively adjusted for 1 to (n) diet PCs
-
-```{r load-mr-data}
-
-outcome_vars <- names(outcomes.l)
-
-## raw vegetables
-veg_mrdat.l <- lapply(outcome_vars, function(out) {
-    mrBycov <- lapply(covarSetGroups$dietGroup2$Sets, function(set) {
-      pheno_tag_covar_out <- paste0(veg_tag, "_", out, "_", set) 
-      readRDS(paste0(mrDir, "/", pheno_tag_covar_out, "_MRoutput.rda"))
-    }) ; names(mrBycov) <- covarSetGroups$dietGroup2$Sets
-    return(mrBycov)
-}) ; names(veg_mrdat.l) = outcome_vars
-
-## fresh fruit
-fruit_mrdat.l <- lapply(outcome_vars, function(out) {
-    mrBycov <- lapply(covarSetGroups$dietGroup2$Sets, function(set) {
-      fruit_tag_covar_out <- paste0(fruit_tag, "_", out, "_", set) 
-      readRDS(paste0(mrDir, "/", fruit_tag_covar_out, "_MRoutput.rda"))
-    }) ; names(mrBycov) <- covarSetGroups$dietGroup2$Sets
-    return(mrBycov)
-}) ; names(fruit_mrdat.l) = outcome_vars
-
-
-```
-
-
-## MR Summary Plots 
-
-```{r plot-mr-main, fig.asp=0.55, fig.height=6}
-
-# ===============================================================
-## MR total forest plot - by COVARIATE set with ADJUSTED betas
-# ===============================================================
-
-plot_MRforestByCovar.fun <- function(mrdat.l, food, group, y, beta="adjB", snpSet="All", plot_method="both") {
-  
-  ## Prepare plotting data
-  mr_sum_forest <- do.call(rbind.data.frame, lapply(covarSetGroups[[group]]$Sets, function(set) {
-    mrdat.l[[y]][[set]][[beta]][[snpSet]]$mr_summary %>% 
-      filter(method == "MR Egger" | method == "Inverse variance weighted") %>%
-      mutate(method=gsub("Inverse variance weighted","IVW", method)) %>%
-      mutate(covar=rep(covarSets[[set]]$Label, nrow(.)), .before="method") } )) %>%
-    mutate(covar=factor(covar, levels=covarSetGroups$dietGroup2$Labels)) %>%
-    mutate(nPCs=as.numeric(gsub("Top", "", gsub("DietPC.*", "", covar)))) %>%
-    mutate(outcome.lab=outcomes.l[[y]]$Label)
-  
-  
-  plot_type <- mr_sum_forest$type[1]
-  
-  if(plot_method != "both") {
-    mr_sum_forest <- mr_sum_forest %>% filter(method == plot_method)
-  }
-    
-  
-   # Set color palette
-  if(food=="raw_veg") {
-    plot_colors<-palettes$classicgreen} else{
-      plot_colors<-palettes$classicorange
-  }
-  
-  # Plot 
-  plot_templ <- mr_sum_forest %>% 
-    ggplot(aes(x=estimate, xmin=lci95, xmax=uci95, y=as.numeric(nPCs), group=rev(covar), color=covar)) +
-    ggthemeMR + 
-    geom_point(size=1.85) + 
-    geom_errorbar(aes(xmin=lci95, xmax=uci95), width=0.35, lwd=0.5) +
-    scale_color_manual(values=plot_colors) + 
-    ylab("# dietPCs adjusted") +
-    scale_y_continuous(breaks=seq(1, max(mr_sum_forest$nPCs), 1)) +
-    theme(axis.text.y = element_text(color = "black", size = 10), 
-          legend.position = "none")
-  
-  if(plot_method != "both") {
-    plot_facet <- plot_templ + 
-      facet_wrap(~outcome.lab, scales="free_x", nrow=1)
-    xlab = paste0(plot_type, " (95% CI) from ", plot_method)
-    } else { 
-    plot_facet <- plot_templ + 
-      facet_wrap(~method, scales="free_x", nrow=1)
-    xlab = paste0(plot_type, " (95% CI) for ", outcomes.l[[y]]$Label)
-  }
-    
-    if(plot_type == "OR") {
-      plot_facet + 
-        geom_vline(xintercept = 1, linewidth=0.35) +
-        scale_x_log10(expand = c(0.2,0.05)) +
-        xlab(xlab)
-    } else {
-      plot_facet + 
-        geom_vline(xintercept = 0, linewidth=0.35) +
-        scale_x_continuous(expand = c(0.2,0.05)) +
-        xlab(xlab)
-    }
-}
-
-
-# ===================
-## Raw vegetables
-# ===================
-
-ggsave(filename="../output/raw_veg_v2_dietGroup2_plotMRforest_alloutcomes.pdf", height=8, width=16)
-ggarrange(
-  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[1], plot_method="IVW"),
-  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[2], plot_method="IVW"),
-  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[3], plot_method="IVW"),
-  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[4], plot_method="IVW"),
-  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[5], plot_method="IVW"),
-  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[6], plot_method="IVW"),
-  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[7], plot_method="IVW"),
-  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[8], plot_method="IVW"),
-  nrow=2, ncol=4
-)
-
-
-# ===================
-## Fresh fruit
-# ===================
-
-ggsave(filename="../output/fresh_fruit_v2_dietGroup2_plotMRforest_alloutcomes.pdf", height=8, width=16)
-ggarrange(
-  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[1], plot_method="IVW"),
-  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[2], plot_method="IVW"),
-  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[3], plot_method="IVW"),
-  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[4], plot_method="IVW"),
-  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[5], plot_method="IVW"),
-  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[6], plot_method="IVW"),
-  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[7], plot_method="IVW"),
-  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[8], plot_method="IVW"),
-  nrow=2, ncol=4
-)
-
-
-```
-
-
-
-
-
-
-
-
-
+- We then compared the effects of dPC adjustment to confounder adjusment. We hypothesized that adjusting for each confounder will attenuate the associations to a modest degree; and that adjusting for an appropriate amount of dPCs will attenuate the associations to a greater degree, representing correction for behaviora/lifestyle confounders. 
 
 
 
