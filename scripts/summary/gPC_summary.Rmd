@@ -37,12 +37,11 @@ veg_gPCs = fread("../data/processed/rediMR/raw_veg_v2_geneticPCs_agesex_tabBchan
 ```
 
 # Plot % B change as dot plot
-```{r}
 
+```{r}
 tab <- veg_gPCs %>%
     pivot_Bdat_to_long() %>%
     mutate(Covar = factor(Covar, levels=c(covarSetGroups$geneticPCs$Labels)))
-  
   yscale <- ceiling(max(abs(tab$B_pctChange))*1.05)
 
   tab %>%
@@ -53,12 +52,11 @@ tab <- veg_gPCs %>%
     geom_point(size=1.35, position=position_jitter(0.15), alpha=0.95) + 
     scale_y_continuous(limits=c(-yscale, yscale), breaks=c(-60, -40, -20, -10, 10, 20, 40, 60)) +
     geom_hline(yintercept = c(-10, 10), color = "black", linetype = "dashed") + 
-    scale_color_manual(values =  plot_colors, name = "Confounder", guide=F) +
+    scale_color_manual(values=c(palettes$classicorange), guide=F) +
     #ylab("% change in SNP-diet estimate \n with confounder adjustment") + xlab(" ") + 
     ylab("% change in SNP-diet estimate") + xlab(" ") + 
     theme(axis.text.x = element_text(angle=25, hjust=1, size=8),
           axis.title = element_text(size=8), axis.text.y=element_text(size=8))
-}
 
 ```
 
@@ -78,7 +76,7 @@ tab_all <- veg_gPCs %>%
   yscale<-max(abs(tab_all$lowCI*1.0), abs(tab_all$upCI*1.0))
   
   # If plotPCs != all, which PCs should be plotted?
-  tab_all %>% 
+plot_adjB_gPCs <- tab_all %>% 
     ggplot(aes(x=as.numeric(gPCs), y = B, group=snp, color = as.factor(gPCs))) + 
     theme_bw() + ggtheme2 + 
     geom_hline(yintercept = 0, color = "black") + 
@@ -91,12 +89,11 @@ tab_all <- veg_gPCs %>%
     #ylab("SNP-diet estimate (95% CI) \n with DietPC adjustment") + 
     ylab("SNP-diet estimates (95% CI)") + 
    # xlab("n dietPCs adjusted") +
-    xlab(NULL) +
+    xlab("# genetic PCs adjusted") +
     theme(legend.position = "none",
           axis.text = element_text(size=8), axis.title = element_text(size=8))
-}
 
-
+plot_adjB_gPCs %>% ggsave(filename="../output/raw_veg_v2_plot_gPC_Bchange_abs_compare.pdf", height = 3, width =8)
 ```
 
 

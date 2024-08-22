@@ -1,0 +1,146 @@
+---
+title: "mr_summary"
+output: html_document
+date: "2024-08-21"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+##### Next, we ran a series of MR analyses for [each of 8 outcomes] using genetic instruments for DIET traits constructed from GWAS-significant loci, progressively adjusted for 1 to (n) diet PCs
+
+```{r load-mr-data}
+
+outcome_vars <- names(outcomes.l)
+
+## raw vegetables
+veg_mrdat.l <- lapply(outcome_vars, function(out) {
+    mrBycov <- lapply(covarSetGroups$dietGroup2$Sets, function(set) {
+      pheno_tag_covar_out <- paste0(veg_tag, "_", out, "_", set) 
+      readRDS(paste0(mrDir, "/", pheno_tag_covar_out, "_MRoutput.rda"))
+    }) ; names(mrBycov) <- covarSetGroups$dietGroup2$Sets
+    return(mrBycov)
+}) ; names(veg_mrdat.l) = outcome_vars
+
+## fresh fruit
+fruit_mrdat.l <- lapply(outcome_vars, function(out) {
+    mrBycov <- lapply(covarSetGroups$dietGroup2$Sets, function(set) {
+      fruit_tag_covar_out <- paste0(fruit_tag, "_", out, "_", set) 
+      readRDS(paste0(mrDir, "/", fruit_tag_covar_out, "_MRoutput.rda"))
+    }) ; names(mrBycov) <- covarSetGroups$dietGroup2$Sets
+    return(mrBycov)
+}) ; names(fruit_mrdat.l) = outcome_vars
+
+
+```
+
+
+## MR Summary Plots 
+
+```{r plot-mr-main, fig.asp=0.55, fig.height=6}
+
+# ===============================================================
+## MR total forest plot - by COVARIATE set with ADJUSTED betas
+# ===============================================================
+
+plot_MRforestByCovar.fun <- function(mrdat.l, food, group, y, beta="adjB", snpSet="All", plot_method="both") {
+  
+  ## Prepare plotting data
+  mr_sum_forest <- do.call(rbind.data.frame, lapply(covarSetGroups[[group]]$Sets, function(set) {
+    mrdat.l[[y]][[set]][[beta]][[snpSet]]$mr_summary %>% 
+      filter(method == "MR Egger" | method == "Inverse variance weighted") %>%
+      mutate(method=gsub("Inverse variance weighted","IVW", method)) %>%
+      mutate(covar=rep(covarSets[[set]]$Label, nrow(.)), .before="method") } )) %>%
+    mutate(covar=factor(covar, levels=covarSetGroups$dietGroup2$Labels)) %>%
+    mutate(nPCs=as.numeric(gsub("Top", "", gsub("DietPC.*", "", covar)))) %>%
+    mutate(outcome.lab=outcomes.l[[y]]$Label)
+  
+  
+  plot_type <- mr_sum_forest$type[1]
+  
+  if(plot_method != "both") {
+    mr_sum_forest <- mr_sum_forest %>% filter(method == plot_method)
+  }
+    
+  
+   # Set color palette
+  if(food=="raw_veg") {
+    plot_colors<-palettes$classicgreen} else{
+      plot_colors<-palettes$classicorange
+  }
+  
+  # Plot 
+  plot_templ <- mr_sum_forest %>% 
+    ggplot(aes(x=estimate, xmin=lci95, xmax=uci95, y=as.numeric(nPCs), group=rev(covar), color=covar)) +
+    ggthemeMR + 
+    geom_point(size=1.85) + 
+    geom_errorbar(aes(xmin=lci95, xmax=uci95), width=0.35, lwd=0.5) +
+    scale_color_manual(values=plot_colors) + 
+    ylab("# dietPCs adjusted") +
+    scale_y_continuous(breaks=seq(1, max(mr_sum_forest$nPCs), 1)) +
+    theme(axis.text.y = element_text(color = "black", size = 10), 
+          legend.position = "none")
+  
+  if(plot_method != "both") {
+    plot_facet <- plot_templ + 
+      facet_wrap(~outcome.lab, scales="free_x", nrow=1)
+    xlab = paste0(plot_type, " (95% CI) from ", plot_method)
+    } else { 
+    plot_facet <- plot_templ + 
+      facet_wrap(~method, scales="free_x", nrow=1)
+    xlab = paste0(plot_type, " (95% CI) for ", outcomes.l[[y]]$Label)
+  }
+    
+    if(plot_type == "OR") {
+      plot_facet + 
+        geom_vline(xintercept = 1, linewidth=0.35) +
+        scale_x_log10(expand = c(0.2,0.05)) +
+        xlab(xlab)
+    } else {
+      plot_facet + 
+        geom_vline(xintercept = 0, linewidth=0.35) +
+        scale_x_continuous(expand = c(0.2,0.05)) +
+        xlab(xlab)
+    }
+}
+
+
+# ===================
+## Raw vegetables
+# ===================
+
+ggsave(filename="../output/raw_veg_v2_dietGroup2_plotMRforest_alloutcomes.pdf", height=8, width=16)
+ggarrange(
+  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[1], plot_method="IVW"),
+  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[2], plot_method="IVW"),
+  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[3], plot_method="IVW"),
+  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[4], plot_method="IVW"),
+  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[5], plot_method="IVW"),
+  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[6], plot_method="IVW"),
+  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[7], plot_method="IVW"),
+  plot_MRforestByCovar.fun(veg_mrdat.l, "raw_veg", "dietGroup2", outcome_vars[8], plot_method="IVW"),
+  nrow=2, ncol=4
+)
+
+
+# ===================
+## Fresh fruit
+# ===================
+
+ggsave(filename="../output/fresh_fruit_v2_dietGroup2_plotMRforest_alloutcomes.pdf", height=8, width=16)
+ggarrange(
+  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[1], plot_method="IVW"),
+  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[2], plot_method="IVW"),
+  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[3], plot_method="IVW"),
+  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[4], plot_method="IVW"),
+  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[5], plot_method="IVW"),
+  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[6], plot_method="IVW"),
+  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[7], plot_method="IVW"),
+  plot_MRforestByCovar.fun(fruit_mrdat.l, "fresh_fruit", "dietGroup2", outcome_vars[8], plot_method="IVW"),
+  nrow=2, ncol=4
+)
+
+
+```
