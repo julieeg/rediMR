@@ -11,6 +11,7 @@ archive/*
 run/*
 output/*
 doc/*
+README.html
 
 # Microsoft Office files
 *.docx
