@@ -1,5 +1,4 @@
-README
-rediMR v2.0
+README for rediMR v2.0 \n
 Last Updated: Aug 22, 2024
 
 
