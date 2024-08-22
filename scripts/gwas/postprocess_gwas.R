@@ -56,6 +56,7 @@ ss <- fread(paste0(ss_path, ".gwas")) %>% rename(CHR="#CHROM") %>%
 
 # Save ssInput file with selected columns
 readr::write_tsv(ss %>% rename("#CHROM"=CHR), paste0(ss_path, ".gwas"))
+readr::write_tsv(ss, paste0(ss_path, "_gwas_sumstats_full.csv"))
 
 # File storage
 plot_dir <- paste0(dirname(ss_path), "/gwas_plots")
