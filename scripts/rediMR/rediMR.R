@@ -111,7 +111,7 @@ tabBchangeAllCov <- do.call(rbind.data.frame, mclapply(snps, function(snp) {
                  adjCovar=covarSet$Covars,
                  baseCovars=gwasCovars,
                  covarName = covarSet$Label, data=dat) }, mc.cores = 8 ))
-head(tabBchangeAllCov)
+
 tabBchangeAllCov <- tabBchangeAllCov %>% 
   mutate(RefinedSet = ifelse(abs(B_pctChange) < as.numeric(pctBthold),1,0))
 
