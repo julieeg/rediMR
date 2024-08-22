@@ -1,7 +1,8 @@
-################################################################################
-# README for rediMR - v1.0
-################################################################################
+#README FILE
 
+##################################################################################################################################
+#  ~~~~~  The Umbrella Hypothesis: Leveraging diet PCs to understand gene-diet-risk factor relationships (rediMR v2)   ~~~~~  #
+##################################################################################################################################
 
 ## Pre-loaded covariate set lists:
 * stnd ---------> Smoking, Alcohol, Physical Activity, Income, Education, BMI, Waist-to-hip, Diet Pattern PC1-PC10
@@ -13,5 +14,4 @@
 * dietpctop10 --> Diet Pattern PC1-PC10
 * dietpctop15 --> Diet Pattern PC1-PC15
 * dietpctop20 --> Diet Pattern PC1-PC20
-
 
