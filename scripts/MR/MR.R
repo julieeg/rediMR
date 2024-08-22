@@ -1,4 +1,4 @@
-#MR excerpt from rediMR.R
+#Run an MR for an exposure-outcome pair; adjusting for sets of covariates 
 
 
 #////////////////////////////////////////\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\#
@@ -16,7 +16,7 @@ lapply(c("tidyverse", "data.table", "parallel", "paletteer", "RColorBrewer",
 
 
 # load pantry file with stored parameters, basic functions & ggplot templates
-source("../scripts/pantry.R")
+source("../scripts/pantry/pantry.R")
 
 
 
@@ -100,7 +100,7 @@ library(TwoSampleMR) ; library(ieugwasr)
 
 
 # establish token for ieugwas access
-opengwas_jwt <- "eyJhbGciOiJSUzI1NiIsImtpZCI6ImFwaS1qd3QiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJhcGkub3Blbmd3YXMuaW8iLCJhdWQiOiJhcGkub3Blbmd3YXMuaW8iLCJzdWIiOiJqdWxpZS5nZXJ2aXNAdHVmdHMuZWR1IiwiaWF0IjoxNzE4NzM3MDA2LCJleHAiOjE3MTk5NDY2MDZ9.HLILykKTdeZJFp9-cYrNYtXR2xaTzQqPux5ojo3FTVHfWnJgkaSPozmeLHRYerD1sn8TSzc7l_FnPF4vFLPz7nufnp5tEtk4XButsDl9YXnjW-WvFgJ_sDDM1JucDi6IiO0-Bn9o5bppto9clUGku67sp3XYbwxxhQnCBCv-mfos8XI4x42y4GdjePOOklfLUiHxT_mt6F6tHKApyj0ssLC8T4b6cbEfD30jyA02V5XEhuUjSgFKM83rY6Qv0aB_SeaXygAV6sf5MkX4PTO49y7pcD4lDODqBwZlAroSWLikcWk1qKmfQvEQx5vadoyzHCcZlC5ATrz1Y5EMppAhhA"
+opengwas_jwt <- "ACCESS_TOKEN"
 
 cat("\n Starting Step 2: Two-Sample Mendelian Randomization ... \n ")
 
@@ -142,7 +142,7 @@ exposure_dat.l <- lapply(1:3, function(set) exposure_dat.l[[set]] %>% mutate(snp
 ## Compile outcomes from ieuGWAS
 # ======================================
 
-outcome_dat <- extract_outcome_data(snps=exposure_dat$SNP, outcome = outcome$id.outcome, rsq=0.5, opengwas_jwt = opengwas_jwt)
+outcome_dat <- extract_outcome_data(snps=exposure_dat$SNP, outcome = outcome$id.outcome, rsq=0.5, opengwas_jwt=access_token)
 
 
 
@@ -214,10 +214,11 @@ mr_results.l <- lapply(c(F,T), function(adjB) {
   return(sets.l)
   }) ; names(mr_results.l) <- c("rawB", "adjB")
 
+mr_results_raw <- mr_results.l
 
 ## Save the file as pheno_tag_outcome_covarSet
 saveRDS(mr_results.l, file = paste0(mrDir, "/", pheno_tag_out_covarSet, "_MRoutput.rda"))
-
+write.csv(do.call(rbind.data.frame, mr_results.l), file = paste0(mrDir, "/", pheno_tag_out_covarSet, "_MRoutput.csv"))
 
 
 ##########################

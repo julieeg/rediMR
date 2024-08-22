@@ -15,109 +15,129 @@ library(tidyverse) ; library(table1)
 ##  Covariate sets
 # =========================================
 
-## Base GWAS ===========
-gwasCovarsBase <- paste0(c("age","sex", paste0("gPC", 1:10)), collapse = "+")
-covarSetgwas <- c("age","sex", paste0("gPC", 1:10))
+## Base covariates ===========
+covarSetsBase <- list(
+  
+  gwas = list(
+    Label="Base covariates",
+    Covars=c("age","sex", paste0("gPC", 1:10)),
+    Formatted=paste0(c("age","sex", paste0("gPC", 1:10)), collapse = "+")
+  ),
+  
+  agesex = list(
+    Label="Base covariates",
+    Covars=c("age","sex"),
+    Formatted=paste0(c("age","sex"), collapse = "+")),
+  
+  dietpcs = list(
+    Label="All Diet PCs",
+    Covars=c(paste0("dietPC", 1:23)),
+    Formatted=paste0("dietPC", 1:23, collapse="+"))
+  
+)
 
-gwasCovarsBaseAgeSex <- c("age","sex")
-covarSetgwasAgeSex <- c("age","sex", paste0("gPC", 1:10))
 
-## Diet PCs for rediMR adjustment ===========
+## Top 1-23 diet PCs (no confounders) ===========
 
-# Diet PCs without pheno 
 covarSets <- list()
 for (i in 1:23) {
-  
   covarSets[[i]] <- list(
     Label=paste0("Top", i, "DietPCs"),
     Covars=c(sapply(1:i, function(j) paste0("dietPC", j))),
     Names=c(sapply(1:i, function(j) paste0("Diet Pattern PC", j)))
   ) ; names(covarSets[[i]]$Names) <- c(covarSets[[i]]$Covars)
-  
 } ; names(covarSets) <- c("dietpc1", paste0("dietpctop", 2:23))
 
+covarSets$alldietpcs = list(
+  Label = "DietPCs",
+  Covars = paste0(covarSets$dietpctop23$Covars, collapse = "+"),
+  Names = "DietPCs"
+)
 
-# "Standard" rediMR covariates
+
+## Confounders ==============
+
+confounder_Label <- c("Smoking"="smoke", "Alcohol"="alch", "Physical Activity"="pa", 
+                      "Income"="inc", "Education"="educ", 
+                      "BMI"="bmi", "Waist2Hip"="w2h")
+
 covarSets$stnd = list(
-  Label = "Standard",
+  Label = "Standard rediMR Covariates",
   Covars = c(
     "smoke_level.lab", "alch_freq.lab", "pa_met_excess_level.lab", 
-    "income_level.lab", "educ_level.lab", "bmi", "waist2hip"), #, paste0("dietPC", 1:10)),
+    "income_level.lab", "educ_level.lab", "bmi", "waist2hip", paste0("dietPC", 1:10)),
   Names = c(
     smoke_level.lab="Smoking", alch_freq.lab="Alcohol", 
     pa_met_excess_level.lab="Physical Activity", income_level.lab = "Income", 
-    educ_level.lab="Education", bmi="BMI", waist2hip="Waist-to-hip") #,
-    #dietPC1="Diet Pattern PC1", dietPC2="Diet Pattern PC2", dietPC3="Diet Pattern PC3",
-    #dietPC4="Diet Pattern PC4", dietPC5="Diet Pattern PC5", 
-    #dietPC6="Diet Pattern PC6", dietPC7="Diet Pattern PC7", dietPC8="Diet Pattern PC8", 
-    #dietPC9="Diet Pattern PC9", dietPC10="Diet Pattern PC10") 
-  )
+    educ_level.lab="Education", bmi="BMI", waist2hip="Waist-to-hip",
+    dietPC1="Diet Pattern PC1", dietPC2="Diet Pattern PC2", dietPC3="Diet Pattern PC3",
+    dietPC4="Diet Pattern PC4", dietPC5="Diet Pattern PC5", 
+    dietPC6="Diet Pattern PC6", dietPC7="Diet Pattern PC7", dietPC8="Diet Pattern PC8", 
+    dietPC9="Diet Pattern PC9", dietPC10="Diet Pattern PC10") 
+)
+
+covarSets$confounders = list(
+  Label = "All_Confounders",
+  Covars = c(
+    "smoke_level.lab", "alch_freq.lab", "pa_met_excess_level.lab", 
+    "income_level.lab", "educ_level.lab", "bmi", "waist2hip"),
+  Names = c(
+    smoke_level.lab="Smoking", alch_freq.lab="Alcohol", 
+    pa_met_excess_level.lab="Physical Activity", income_level.lab = "Income", 
+    educ_level.lab="Education", bmi="BMI", waist2hip="Waist2Hip")
+)
+
+covarSets$confounders_num = list(
+  Label = "All_Confounders (numeric)",
+  Covars = c(
+    "smoke_level.num", "alch_freq.num", "pa_met_excess_level.num", 
+    "income_level.num", "educ_level.num", "bmi", "waist2hip"),
+  Names = c(
+    smoke_level.lab="Smoking", alch_freq.lab="Alcohol", 
+    pa_met_excess_level.lab="Physical Activity", income_level.lab = "Income", 
+    educ_level.lab="Education", bmi="BMI", waist2hip="Waist2Hip")
+)
 
 
-# Diet PCs WITH pheno ================
+## Top 1-23 diet PCs and EACH confounder ===================
 
-covarSetsAdd <- list()
-for (i in 1:24) {
-  
-  covarSetsAdd[[i]] <- list(
-    Label=paste0("Top", i, "DietPCsAll"),
-    Covars=c(sapply(1:i, function(j) paste0("dietPC",j,"all"))),
-    Names=c(sapply(1:i, function(j) paste0("Diet Pattern PC", j, " (All)")))
-  ) ; names(covarSetsAdd[[i]]$Names) <- c(covarSetsAdd[[i]]$Covars)
-  
-} ; names(covarSetsAdd) <- c("dietpc1all", paste0("dietpctop", 2:24, "all"))
+dietEachConf = list(
+  Label="Diet PCs + Each Confounder",
+  Covars=c(sapply(1:length(confounder_Label), function(i) {paste0(paste0(covarSets$dietpctop23$Covars, collapse="+"), "+", covarSets$confounders_num$Covars[i])})),
+  Names=c(sapply(1:length(confounder_Label), function(i) paste0("Diet PCs + ", names(confounder_Label)[i])))
+) ; names(dietEachConf$Names) <- paste0("dietpcsAnd", confounder_Label)
 
-
-## Append
-covarSets <- c(covarSets, covarSetsAdd)
-
-
-## Add diet PCs with EACH confounder ===================
-
-confounder_pref <- c("Smoke"="smoke", "Alch"="alch", "PhysAct"="pa", "Income"="inc", "Educ"="educ", "BMI"="bmi", "Waist2Hip"="w2h")
-confounder_vars.num <- c("smoke_level.num","alch_freq.num","pa_met_excess_level.num", "income_level.num", "educ_level.num","bmi", "waist2hip")
-
-dietEachconf <- list(
-    Labels=c(sapply(1:length(confounder_pref), function(i) paste0("DietPCs_", names(confounder_pref)[i]))),
-    Covars=c(sapply(1:length(confounder_pref), function(i) {paste0(paste0(covarSets$dietpctop23$Covars, collapse="+"), "+", confounder_vars.num[i])})),
-    Names=c(sapply(1:length(confounder_pref), function(i) paste0("All Diet PCs + ", names(confounder_pref)[i])))
-) ; names(dietEachconf$Names) <- names(confounder_pref) ; names(dietEachconf$Covars) <- paste0("dietpcsAnd", names(confounder_pref))
+add_covarset2 <- list()
+for(i in 1:length(confounder_Label)) {
+  add_covarset2[[i]] <- list(
+    Label = dietEachConf$Names[[i]],
+    Covars = dietEachConf$Covars[i],
+    Names = dietEachConf$Names[i])
+} ; names(add_covarset2) <- names(dietEachConf$Names)
 
 
-covarSetsAdd3 <- list()
-for(i in 1:length(confounder_pref)) {
-  
-  covarSetsAdd3[[i]] <- list(
-    Labels=dietEachconf$Labels[i],
-    Covars=dietEachconf$Covars[i],
-    Names=dietEachconf$Names[i]
-    ) ; names(covarSetsAdd3[[i]]$Names) <- paste0("dietpcsAnd", confounder_pref[i])
-} ; names(covarSetsAdd3) <- paste0("dietpcsAnd", confounder_pref)
-  
 
+## Top 1-23 diet PCs with sequentially ADDED confounders =========================
+dietAddConf = list(
+  Label = "Diet PCs Adding Confounders", 
+  Covars = c(sapply(1:length(confounder_Label), function(i) {paste0(covarSets$alldietpcs$Covars, "+", paste0(covarSets$confounders_num$Covars[1:i], collapse = "+"))})),
+  Names = c(sapply(1:length(confounder_Label), function(i) paste0("Diet PCs + ", i, " Confounders (+", names(confounder_Label)[i], ")") ))
+) ; names(dietAddConf$Names) <-  paste0("dietpcsAdd", confounder_Label)
 
-## Add diet PCs with ADDED confounders =========================
+add_covarset3 <- list()
+for(i in 1:length(confounder_Label)) {
+  add_covarset3[[i]] <- list(
+    Labels = dietAddConf$Names[i],
+    Covars = dietAddConf$Covars[i],
+    Names = dietAddConf$Names[i]) 
+} ; names(add_covarset3) <- names(dietAddConf$Names)
 
-dietAddconf <- list(
-  Labels=c(sapply(1:length(confounder_pref), function(i) paste0("DietPCs_Add", i, "c", names(confounder_pref)[i]))),
-  Covars=c(sapply(1:length(confounder_pref), function(i) {paste0(paste0(covarSets$dietpctop23$Covars, collapse="+"), "+", paste0(confounder_vars.num[1:i], collapse = "+"))})),
-  Names=c(sapply(1:length(confounder_pref), function(i) paste0("All Diet PCs + ", i, " Confounders (+", names(confounder_pref)[i], ")") ))
-) ; names(dietAddconf$Names) <- names(confounder_pref) ; names(dietAddconf$Covars) <- paste0("dietpcsAdd", names(confounder_pref))
-
-
-covarSetsAdd4 <- list()
-for(i in 1:length(confounder_pref)) {
-  
-  covarSetsAdd4[[i]] <- list(
-    Labels=dietAddconf$Labels[i],
-    Covars=dietAddconf$Covars[i],
-    Names=dietAddconf$Names[i]
-  ) ; names(covarSetsAdd4[[i]]$Names) <- paste0("dietpcsAdd", confounder_pref[i])
-} ; names(covarSetsAdd4) <- paste0("dietpcsAdd", confounder_pref)
 
 
 ## append
-covarSets <- c(covarSets, covarSetsAdd3, covarSetsAdd4) 
+covarSets <- c(covarSets, add_covarset2, add_covarset3) 
+
+names(covarSets)
 
 
 
@@ -139,24 +159,15 @@ covarSetGroups <- list(
     Labels =  c(sapply(c(1:23), function(i) covarSets[[i]]$Label))
     ),
   
-  dietGroup3 = list(
-    Sets = c(names(covarSets)[25:48]),
-    Names = c(sapply(c(25:48), function(i) covarSets[[i]]$Names)),
-    Labels = c(sapply(c(25:48), function(i) covarSets[[i]]$Label))
-  ),
-  
   dietEachConf = list(
-    Sets = c(names(covarSets)[c(1:23,49:55)]),
-    Names = c(sapply(c(1:23,49:55), function(i) covarSets[[i]]$Names)),
-    Labels = c(sapply(c(1:23,49:55), function(i) covarSets[[i]]$Label))
-  ),
+    Sets = c(names(dietEachConf$Names)),
+    Names = c(dietEachConf$Names),
+    Labels = as.vector(dietEachConf$Names)),
   
   dietAddConf = list(
-    Sets = c(names(covarSets)[c(1:23,56:62)]),
-    Names = c(sapply(c(1:23,56:62), function(i) covarSets[[i]]$Names)),
-    Labels = c(sapply(c(1:23,56:62), function(i) covarSets[[i]]$Label))
-  )
-    
+    Sets = c(names(dietAddConf$Names)),
+    Names = c(dietAddConf$Names),
+    Labels = as.vector(dietAddConf$Names))
 )
   
 
@@ -212,7 +223,7 @@ confounders <- c(
   waist2hip = "Waist-to-hip"
 )
 
-confounders_num.l <- c(
+confounders_num <- c(
   smoke_level.num = "Smoking",
   alch_freq.num = "Alcohol",
   pa_met_excess_level.num = "Physical Activity",
@@ -222,18 +233,6 @@ confounders_num.l <- c(
   waist2hip = "Waist-to-hip"
 )
 
-confounders.num=c(
-  "Smoking"="smoke_level.num", "Alcohol"="alch_freq.num", 
-  "Physical Activity"="pa_met_excess_level.num", 
-  "Income"="income_level.num", "Education"="educ_level.num", 
-  "BMI"="bmi", "Waist-to-hip"="waist2hip"
-  )
-
-confounder_vars.num <- c(
-  "smoke_level.num","alch_freq.num","pa_met_excess_level.num",
-  "income_level.num", "educ_level.num",
-  "bmi", "waist2hip")
-
 
 # ======================================
 ## Compile MR outcomes from ieuGWAS
@@ -241,24 +240,62 @@ confounder_vars.num <- c(
 
 outcomes.l <- list(
   colcan = list(
-    Label="Colorectal Cancer", var="colorectal_cancer", id.outcome="finn-b-C3_COLORECTAL", type="OR",
+    Label="Colorectal Cancer", 
+    var="colorectal_cancer", 
+    id.outcome="finn-b-C3_COLORECTAL", 
+    type="OR",
     Name=c("colcan" = "Colorectal Cancer")),
   ischem = list(
-    Label="Ischemic Stroke", var="ischemic_stroke", id.outcome="finn-b-I9_STR_EXH_EXNONE", type="OR",
+    Label="Ischemic Stroke", 
+    var="ischemic_stroke", 
+    id.outcome="finn-b-I9_STR_EXH_EXNONE", 
+    type="OR",
     Name=c("ischem"="Ischemic Stroke")),
   depr = list(
-    Label = "Depression", var="depression", id.outcome="finn-b-F5_DEPRESSIO", type="OR",
+    Label = "Depression", 
+    var="depression", 
+    id.outcome="finn-b-F5_DEPRESSIO", 
+    type="OR",
     "depr"= "Depression"),
   t2d = list(
-    Label="T2D", var="t2d", id.outcome="ebi-a-GCST006867", type="OR", Name=c("t2d"= "T2D")),
+    Label="T2D", 
+    var="t2d", 
+    id.outcome="ebi-a-GCST006867", 
+    type="OR", 
+    Name=c("t2d"= "T2D")),
   crp = list(
-    Label="CRP", var="crp", id.outcome="prot-a-670", type="Beta", Name=c("crp"="CRP")),
+    Label="CRP", 
+    var="crp",
+    id.outcome="prot-a-670", 
+    type="Beta",
+    Name=c("crp"="CRP")),
   tg = list(
-    Label="TG", var="tg", id.outcome="ebi-a-GCST002216", type="Beta", Name=c("tg"="TG")),
+    Label="TG", 
+    var="tg", 
+    id.outcome="ebi-a-GCST002216", 
+    type="Beta", 
+    Name=c("tg"="TG")),
   dbp = list(
-    Label="DBP", var="dbp", id.outcome="ebi-a-GCST90018952", type="Beta",Name=c("dbp"="DBP")),
+    Label="DBP", 
+    var="dbp", 
+    id.outcome="ebi-a-GCST90018952",
+    type="Beta",
+    Name=c("dbp"="DBP")),
   gluc = list(
-    Label="Glucose", var="glucose", id.outcome="ieu-b-113", type="Beta", Name=c("gluc"="Glucose"))
+    Label="Glucose", 
+    var="glucose",
+    id.outcome="ieu-b-113", 
+    type="Beta", 
+    Name=c("gluc"="Glucose")),
+  
+  ## Outcomes added on 8-22-2024
+  dbp_icbp = list(
+    Label="DBP (Int Const BP)",
+    var="dbp",
+    id.outcome="ieu-b-39",
+    type="Beta",
+    Name=c("dbp"="DBP (Int Const BP)"))
+  
 )
 
 outcome.Labs <- c(sapply(1:length(outcomes.l), function(i) outcomes.l[[i]]$label))
