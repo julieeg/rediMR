@@ -1,4 +1,4 @@
-#Run an MR for an exposure-outcome pair; adjusting for sets of covariates 
+#Run an MR for a LIST of tan exposure-outcome pair; adjusting for sets of covariates 
 
 
 #////////////////////////////////////////\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\#
@@ -30,7 +30,7 @@ source("../scripts/pantry/pantry.R")
 
 # command args
 args <- commandArgs(trailingOnly = TRUE)
-pheno <- args[1] #diet phenotype
+trait_list <- read.csv("../data/raw/trait_index.csv") #args[1] #diet phenotype
 tag <- args[2] #version "tag"
 covar <- args[3]
 outcome <- args[4]
