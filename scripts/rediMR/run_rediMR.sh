@@ -12,11 +12,11 @@
 ## ReDiMR Inputs
 pheno=$1
 tag=$2
-covarSet=$3
+covars=$3
 
 pheno_tag=${pheno}_${tag}
 
-redimrDir=../data/processed/rediMR
+redimrDir=../data/processed/rediMR/vCole/
 ssInput=${redimrDir}/${pheno_tag}_ssInput.csv
 datInput=${redimrDir}/${pheno_tag}_datInput.rda
 
@@ -37,8 +37,8 @@ use R-4.1
 ##  ~~~~~  Run ReDiMR program  ~~~~~  ##
 ########################################
 
-Rscript ../scripts/rediMR/rediMR.R $pheno $tag $covarSet $ssInput $datInput $pctBthhold $redimrDir &&
-echo CONGRATULATIONS! You completed rediMR for $pheno, adjusting for $covarSet covariates.
+Rscript ../scripts/rediMR/rediMR_vCole.R $pheno $tag $covars &&
+echo You completed rediMR for $pheno, adjusting for $covarSet covariates.
 
 
 

@@ -6,9 +6,7 @@ library(tidyverse) ; library(table1)
 
 
 ################################################################################
-# ==============================================================================
 ## Build & store standard parameter inputs & variable lists
-# ==============================================================================
 ################################################################################
 
 # =========================================
@@ -64,11 +62,11 @@ confounder_Label <- c("Smoking"="smoke", "Alcohol"="alch", "Physical Activity"="
 covarSets$stnd = list(
   Label = "Standard rediMR Covariates",
   Covars = c(
-    "smoke_level.lab", "alch_freq.lab", "pa_met_excess_level.lab", 
+    "smoke_level.lab", "alch_freq.lab", "physact_level.lab", 
     "income_level.lab", "educ_level.lab", "bmi", "waist2hip", paste0("dietPC", 1:10)),
   Names = c(
     smoke_level.lab="Smoking", alch_freq.lab="Alcohol", 
-    pa_met_excess_level.lab="Physical Activity", income_level.lab = "Income", 
+    physact_level.lab="Physical Activity", income_level.lab = "Income", 
     educ_level.lab="Education", bmi="BMI", waist2hip="Waist-to-hip",
     dietPC1="Diet Pattern PC1", dietPC2="Diet Pattern PC2", dietPC3="Diet Pattern PC3",
     dietPC4="Diet Pattern PC4", dietPC5="Diet Pattern PC5", 
@@ -76,26 +74,63 @@ covarSets$stnd = list(
     dietPC9="Diet Pattern PC9", dietPC10="Diet Pattern PC10") 
 )
 
-covarSets$confounders = list(
+## Confounders 1 ----------------
+covarSets$confounders1 = list(
   Label = "All_Confounders",
   Covars = c(
-    "smoke_level.lab", "alch_freq.lab", "pa_met_excess_level.lab", 
+    "smoke_level.lab", "alch_freq.lab", "physact_level.lab", 
     "income_level.lab", "educ_level.lab", "bmi", "waist2hip"),
   Names = c(
     smoke_level.lab="Smoking", alch_freq.lab="Alcohol", 
-    pa_met_excess_level.lab="Physical Activity", income_level.lab = "Income", 
+    physact_level.lab="Physical Activity", income_level.lab = "Income", 
     educ_level.lab="Education", bmi="BMI", waist2hip="Waist2Hip")
 )
 
-covarSets$confounders_num = list(
+covarSets$confounders1_num = list(
   Label = "All_Confounders (numeric)",
   Covars = c(
-    "smoke_level.num", "alch_freq.num", "pa_met_excess_level.num", 
+    "smoke_level.num", "alch_freq.num", "physact_level.num", 
     "income_level.num", "educ_level.num", "bmi", "waist2hip"),
   Names = c(
     smoke_level.lab="Smoking", alch_freq.lab="Alcohol", 
-    pa_met_excess_level.lab="Physical Activity", income_level.lab = "Income", 
+    physact_level.lab="Physical Activity", income_level.lab = "Income", 
     educ_level.lab="Education", bmi="BMI", waist2hip="Waist2Hip")
+)
+
+## Confounders 1 (No Alcohol) ----------------
+covarSets$confounders1_noalch = list(
+  Label = "All Confounders (no alcohol)",
+  Covars = c(
+    "smoke_level.lab", "physact_level.lab", 
+    "income_level.lab", "educ_level.lab", "bmi", "waist2hip"),
+  Names = c(
+    smoke_level.lab="Smoking", 
+    physact_level.lab="Physical Activity", income_level.lab = "Income", 
+    educ_level.lab="Education", bmi="BMI", waist2hip="Waist2Hip")
+)
+
+covarSets$confounders1_noalch_num = list(
+  Label = "All Confounders (no alcohol), Numeric",
+  Covars = c(
+    "smoke_level.num", "physact_level.num", 
+    "income_level.num", "educ_level.num", "bmi", "waist2hip"),
+  Names = c(
+    smoke_level.lab="Smoking", 
+    physact_level.lab="Physical Activity", income_level.lab = "Income", 
+    educ_level.lab="Education", bmi="BMI", waist2hip="Waist2Hip")
+)
+
+
+
+covarSets$confounders2_num = list(
+  Label = "All_Confounders",
+  Covars = c(
+    "smoke_level.lab", "alch_drinks_per_week", "physact_met_excess", 
+    "income_level.num", "educ_years.num", "bmi", "waist2hip"),
+  Names = c(
+    smoke_level.lab="Smoking", alch_drinks_per_week="Alcohol", 
+    physact_met_excess="Physical Activity", income_level.lab = "Income", 
+    educ_years.num="Education", bmi="BMI", waist2hip="Waist2Hip")
 )
 
 
@@ -132,11 +167,8 @@ for(i in 1:length(confounder_Label)) {
     Names = dietAddConf$Names[i]) 
 } ; names(add_covarset3) <- names(dietAddConf$Names)
 
-
-
 ## append
 covarSets <- c(covarSets, add_covarset2, add_covarset3) 
-
 names(covarSets)
 
 
@@ -216,7 +248,7 @@ foods.l <- as.list(foods)
 confounders <- c(
   smoke_level.lab = "Smoking",
   alch_freq.lab = "Alcohol",
-  pa_met_excess_level.lab = "Physical Activity",
+  physact_level.lab = "Physical Activity",
   income_level.lab = "Income",
   educ_level.lab = "Education",
   bmi = "BMI", 
@@ -226,7 +258,7 @@ confounders <- c(
 confounders_num <- c(
   smoke_level.num = "Smoking",
   alch_freq.num = "Alcohol",
-  pa_met_excess_level.num = "Physical Activity",
+  physact_level.num = "Physical Activity",
   income_level.num = "Income",
   educ_level.num = "Education",
   bmi="BMI",
@@ -526,14 +558,15 @@ pivot_Bdat_to_long <- function(Bchange.df) {
 ## Calculate %B change with covariate adjustment
 # =================================================
 
-pctBchange.fun <- function(pheno, snp, adjCovar, baseCovars=gwasCovarsBase, covarName=NA, data=dat) {
+pctBchange.fun <- function(pheno, snp, adjCovar, baseCovars=covarSetsBase$gwas$Covars, covarName=NA, data=dat) {
   
-  if(length(baseCovars) > 1) {baseCovars =paste0(baseCovars, collapse="+")}
-  if(length(adjCovar) > 1) {adjCovar =paste0(adjCovar, collapse="+")}
+  if(length(baseCovars) > 1) {baseCovarsFormat <- paste0(baseCovars, collapse="+")} else {
+    baseCovarsFormat <- baseCovars} 
+  if(length(adjCovar) > 1) {adjCovar <- paste0(adjCovar, collapse="+")}
   
   snp_EA <- names(data %>% select(starts_with(snp)))
-  baseM <- lm(formula(paste0(pheno, "~", snp_EA, "+", baseCovars)), data)
-  adjM <- lm(formula(paste0(pheno, "~", snp_EA, "+", gwasCovarsBase, "+", adjCovar)), data)
+  baseM <- lm(formula(paste0(pheno, "~", snp_EA, "+", baseCovarsFormat)), data)
+  adjM <- lm(formula(paste0(pheno, "~", snp_EA, "+", baseCovarsFormat, "+", adjCovar)), data)
   
   baseP=summary(baseM)$coef[2,4]
   adjP=summary(adjM)$coef[2,4]
@@ -600,7 +633,7 @@ palettes <- list(NatComms= paletteer_d("ggsci::nrc_npg", n=10),
                  Confnum=c(
                    "smoke_level.num" = brewer.pal(9, "Oranges")[4], 
                    "alch_freq.num" = brewer.pal(9, "Oranges")[5], 
-                   "pa_met_excess_level.num" = brewer.pal(9, "Oranges")[6],
+                   "physact_level.num" = brewer.pal(9, "Oranges")[6],
                    "income_level.num" = brewer.pal(9, "Blues")[5],
                    "educ_level.num" = brewer.pal(9, "Blues")[6],
                    "bmi" = brewer.pal(9, "Purples")[8],
