@@ -1,4 +1,4 @@
-#Run an MR for a LIST of tan exposure-outcome pair; adjusting for sets of covariates 
+#Run an MR for a LIST of exposure-outcome pair; adjusting for sets of covariates 
 
 
 #////////////////////////////////////////\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\#

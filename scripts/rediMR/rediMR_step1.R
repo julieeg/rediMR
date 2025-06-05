@@ -68,6 +68,7 @@ phenos_id <- fread(phenofile)
 # Define covariate set
 covarSet <- covarSets[[covarset]]
 
+
 # ==================================
 ## Build dietPCs without exposure 
 # ==================================
@@ -100,12 +101,12 @@ if(any(startsWith(covarSet$Covars, "dietPC"))) {
 ## Compile dataset
 # ==================================
 
-phenos_id %>% 
+phenos_id <- phenos_id %>% 
   select(id, 
          all_of(exposure),
          all_of(strsplit(covars_gwas, split=" ")[[1]]),
          all_of(covarSet$Covars)
-)
+) 
 
 dat <- left_join(phenos_id, dose_id, by="id")
 
@@ -114,8 +115,9 @@ cat("\nCovariates for gwas:", covars_gwas,
                                           covarSet$Names, " = ", covarSet$Covars)
 )
 
+
 ##########################################################
-## STEP 1: SNP Refinement based on covariate adjutment  ## 
+## STEP 1: SNP Refinement based on covariate adjustment  ## 
 ##########################################################
 
 cat("\n Starting Step 1: SNP Refinement ... \n ")

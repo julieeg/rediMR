@@ -52,7 +52,7 @@ covarSets$alldietpcs = list(
 
 ## Confounders ==============
 
-# Pilot ("stnd") covariates -------------------------
+# Pilot covariates ("stnd") -------------------------
 confounder_Label <- c("Smoking"="smoke", "Alcohol"="alch", "Physical Activity"="pa", 
                       "Income"="inc", "Education"="educ", 
                       "BMI"="bmi", "Waist2Hip"="w2h")
@@ -296,13 +296,13 @@ pairs.l <- list(
   bread_ldl = list(
     exposure="bread_type_BIN",
     outcome="ldl",
-    pair.label="Bread type (choose whole grain) on LDL",
+    pair.label="Bread type (choose white > whole grain) on LDL",
     exposure.label="Bread type",
     outcome.label="LDL Cholesterol"),
   bread_cvd = list(
     exposure="bread_type_BIN",
     outcome="cvd",
-    pair.label="Bread type (choose whole grain) on CVD",
+    pair.label="Bread type (choose white > whole grain) on CVD",
     exposure.label="Bread type",
     outcome.label="Coronary Artery Disease"),
   alch_cir = list(
@@ -321,6 +321,7 @@ pairs.l <- list(
 
 sets <- c("all"="All", "refined_lt20"="Refined <20%", 
           "refined_lt10"="Refined <10%", "refined_lt05"="Refined <5%")
+
 
 ################################################################################
 ## Basic Functions
