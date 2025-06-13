@@ -12,7 +12,9 @@ library(tidyverse) ; library(table1)
 # =========================================
 ##  Covariate sets for base GWAS
 # =========================================
+
 ## Base covariates ===========
+
 covarSetsBase <- list(
   gwas = list(
     Label="Base covariates",
@@ -28,16 +30,18 @@ covarSetsBase <- list(
     Formatted=paste0("dietPC", 1:23, collapse="+"))
 )
 
+
 # ==============================================
 ##  Covariate sets for confounder adjustment
 # ==============================================
 
 covarSets <- list()
 
-## Top 1-23 diet PCs (no confounders) ===========
+## Top 1-23 diet PCs (FFQ) (no confounders) ===========
+
 for (i in 1:23) {
   covarSets[[i]] <- list(
-    Label=paste0("Top", i, "DietPCs"),
+    Label=paste0("Top ", i, " DietPCs"),
     Covars=c(sapply(1:i, function(j) paste0("dietPC", j))),
     Names=c(sapply(1:i, function(j) paste0("Diet Pattern PC", j)))
   ) ; names(covarSets[[i]]$Names) <- c(covarSets[[i]]$Covars)
@@ -50,43 +54,32 @@ covarSets$alldietpcs = list(
 )
 
 
-## Confounders ==============
+## Top 1-29 diet PCs (24HR) (no confounders) ===========
 
-# Pilot covariates ("stnd") -------------------------
+covar24hrPCs <- list()
+
+for (i in 1:29) {
+  covar24hrPCs[[i]] <- list(
+    Label=paste("Top", i, "DietPCs (24HR)"),
+    Covars=c(sapply(1:i, function(j) paste0("diet24hrPC", j))),
+    Names=c(sapply(1:i, function(j) paste0("Diet Pattern PC", j, " (24HR)")))
+  ) ; names(covar24hrPCs[[i]]$Names) <- c(covar24hrPCs[[i]]$Covars)
+} ; names(covar24hrPCs) <- c("diet24hrpc1", paste0("diet24hrpctop", 2:29))
+
+covar24hrPCs$alldiet24hrpcs = list(
+  Label = "Diet24hrPCs",
+  Covars = paste0(covar24hrPCs$diet24hrpctop29$Covars, collapse = "+"),
+  Names = "Diet24hrPCs"
+)
+
+# Add to covarSets
+covarSets <- c(covarSets, covar24hrPCs)
+
+
+## Basic confounders ==============
+
 confounder_Label <- c("Smoking"="smoke", "Alcohol"="alch", "Physical Activity"="pa", 
-                      "Income"="inc", "Education"="educ", 
-                      "BMI"="bmi", "Waist2Hip"="w2h")
-
-covarSets$basic = list(
-  Label = "Basic covariates",
-  Covars = c(
-    "smoke_level.lab", "alch_freq.lab", "physact_level.lab", 
-    "income_level.lab", "educ_level.lab", "bmi", "waist2hip", paste0("dietPC", 1:10)),
-  Names = c(
-    smoke_level.lab="Smoking", alch_freq.lab="Alcohol", 
-    physact_level.lab="Physical Activity", income_level.lab = "Income", 
-    educ_level.lab="Education", bmi="BMI", waist2hip="Waist-to-hip",
-    dietPC1="Diet Pattern PC1", dietPC2="Diet Pattern PC2", dietPC3="Diet Pattern PC3",
-    dietPC4="Diet Pattern PC4", dietPC5="Diet Pattern PC5", 
-    dietPC6="Diet Pattern PC6", dietPC7="Diet Pattern PC7", dietPC8="Diet Pattern PC8", 
-    dietPC9="Diet Pattern PC9", dietPC10="Diet Pattern PC10") 
-)
-
-covarSets$basic_noalch = list(
-  Label = "Basic covariates",
-  Covars = c(
-    "smoke_level.lab", "physact_level.lab", 
-    "income_level.lab", "educ_level.lab", "bmi", "waist2hip", paste0("dietPC", 1:10)),
-  Names = c(
-    smoke_level.lab="Smoking",
-    physact_level.lab="Physical Activity", income_level.lab = "Income", 
-    educ_level.lab="Education", bmi="BMI", waist2hip="Waist-to-hip",
-    dietPC1="Diet Pattern PC1", dietPC2="Diet Pattern PC2", dietPC3="Diet Pattern PC3",
-    dietPC4="Diet Pattern PC4", dietPC5="Diet Pattern PC5", 
-    dietPC6="Diet Pattern PC6", dietPC7="Diet Pattern PC7", dietPC8="Diet Pattern PC8", 
-    dietPC9="Diet Pattern PC9", dietPC10="Diet Pattern PC10") 
-)
-
+                      "Income"="inc", "Education"="educ", "BMI"="bmi", "Waist2Hip"="w2h")
 
 # Confounders 1 ---------------------------
 
@@ -101,18 +94,8 @@ covarSets$confounders1 = list(
     educ_level.lab="Education", bmi="BMI", waist2hip="Waist2Hip")
 )
 
-covarSets$confounders1_num = list(
-  Label = "All Confounders (numeric)",
-  Covars = c(
-    "smoke_level.num", "alch_freq.num", "physact_level", 
-    "income_level.num", "educ_level.num", "bmi", "waist2hip"),
-  Names = c(
-    smoke_level.lab="Smoking", alch_freq.lab="Alcohol", 
-    physact_level.lab="Physical Activity", income_level.lab = "Income", 
-    educ_level.lab="Education", bmi="BMI", waist2hip="Waist2Hip")
-)
 
-# Confounders 1 (no alcohol) ---------------------------
+## Confounders 1 (no alcohol) 
 
 covarSets$confounders1_noalch = list(
   Label = "All Confounders",
@@ -125,53 +108,82 @@ covarSets$confounders1_noalch = list(
     educ_level.lab="Education", bmi="BMI", waist2hip="Waist2Hip")
 )
 
-covarSets$confounders1_nolach = list(
-  Label = "All Confounders (numeric)",
-  Covars = c(
-    "smoke_level.num", "physact_level", 
-    "income_level.num", "educ_level.num", "bmi", "waist2hip"),
-  Names = c(
-    smoke_level.lab="Smoking",
-    physact_level.lab="Physical Activity", income_level.lab = "Income", 
-    educ_level.lab="Education", bmi="BMI", waist2hip="Waist2Hip")
-)
+
+## Top 1-23 diet PCs (FFQ) and confounders ===================
+
+#!# NOTE: On 2025-06-05: changed the covarSets$confounders from numeric versions to categorical (factor) vesions **
 
 
-## Top 1-23 diet PCs and EACH confounder ===================
+## Diet PCs + EACH confounder -------------------
+
 dietEachConf = list(
   Label="Diet PCs + Each Confounder",
   Covars=c(sapply(1:length(confounder_Label), function(i) {
-    paste0(paste0(covarSets$dietpctop23$Covars, collapse="+"), "+", covarSets$confounders_num$Covars[i])})),
+    paste0(paste0(covarSets$dietpctop23$Covars, collapse="+"), "+", covarSets$confounders1$Covars[i])})),
   Names=c(sapply(1:length(confounder_Label), function(i) paste0("Diet PCs + ", names(confounder_Label)[i])))
-) ; names(dietEachConf$Names) <- paste0("dietpcsAnd", confounder_Label)
+) ; names(dietEachConf$Names) <- paste0("dietpcsEach", confounder_Label)
 
-add_covarset2 <- list()
-for(i in 1:length(confounder_Label)) {
-  add_covarset2[[i]] <- list(
+dietEachConf_add <- lapply(1:length(confounder_Label), function(i) {list(
     Label = dietEachConf$Names[[i]],
     Covars = dietEachConf$Covars[i],
     Names = dietEachConf$Names[i])
-} ; names(add_covarset2) <- names(dietEachConf$Names)
+  }) ; names(dietEachConf_add) <- names(dietEachConf$Names)
 
 
-## Top 1-23 diet PCs with sequentially ADDED confounders =========================
+## Diet PCs + sequentially ADDED confounders -------------------
+
 dietAddConf = list(
   Label = "Diet PCs Adding Confounders", 
   Covars = c(sapply(1:length(confounder_Label), function(i) {
-    paste0(covarSets$alldietpcs$Covars, "+", paste0(covarSets$confounders_num$Covars[1:i], collapse = "+"))})),
+    paste0(covarSets$alldietpcs$Covars, "+", paste0(covarSets$confounders1$Covars[1:i], collapse = "+"))})),
   Names = c(sapply(1:length(confounder_Label), function(i) paste0("Diet PCs + ", i, " Confounders (+", names(confounder_Label)[i], ")") ))
 ) ; names(dietAddConf$Names) <-  paste0("dietpcsAdd", confounder_Label)
 
-add_covarset3 <- list()
-for(i in 1:length(confounder_Label)) {
-  add_covarset3[[i]] <- list(
-    Labels = dietAddConf$Names[i],
-    Covars = dietAddConf$Covars[i],
-    Names = dietAddConf$Names[i]) 
-} ; names(add_covarset3) <- names(dietAddConf$Names)
+dietAddConf_add <- lapply(1:length(confounder_Label), function(i) {list(
+  Label = dietAddConf$Names[[i]],
+  Covars = dietAddConf$Covars[i],
+  Names = dietAddConf$Names[i])
+}) ; names(dietAddConf_add) <- names(dietAddConf$Names)
+
+
+
+## Top 1-23 diet PCs (24HR) and EACH confounder ===================
+
+## Diet PCs + EACH confounder -------------------
+
+diet24hrEachConf = list(
+  Label="Diet PCs (24HR) + Each Confounder",
+  Covars=c(sapply(1:length(confounder_Label), function(i) {
+    paste0(paste0(covarSets$alldiet24hrpcs$Covars, collapse="+"), "+", covarSets$confounders1$Covars[i])})),
+  Names=c(sapply(1:length(confounder_Label), function(i) paste0("Diet PCs (24HR) + ", names(confounder_Label)[i])))
+) ; names(diet24hrEachConf$Names) <- paste0("diet24hrpcsEach", confounder_Label)
+
+diet24hrEachConf_add <- lapply(1:length(confounder_Label), function(i) {list(
+  Label = diet24hrEachConf$Names[[i]],
+  Covars = diet24hrEachConf$Covars[i],
+  Names = diet24hrEachConf$Names[i])
+}) ; names(diet24hrEachConf_add) <- names(diet24hrEachConf$Names)
+
+
+## Diet PCs + sequentially ADDED confounders -------------------
+
+diet24hrAddConf = list(
+  Label = "Diet PCs (24HR) Adding Confounders", 
+  Covars = c(sapply(1:length(confounder_Label), function(i) {
+    paste0(covarSets$alldiet24hrpcs$Covars, "+", paste0(covarSets$confounders1$Covars[1:i], collapse = "+"))})),
+  Names = c(sapply(1:length(confounder_Label), function(i) paste0("Diet PCs (24HR) + ", i, " Confounders (+", names(confounder_Label)[i], ")") ))
+) ; names(diet24hrAddConf$Names) <-  paste0("diet24hrpcsAdd", confounder_Label)
+
+diet24rAddConf_add <- lapply(1:length(confounder_Label), function(i) {list(
+  Label = diet24hrAddConf$Names[[i]],
+  Covars = diet24hrAddConf$Covars[i],
+  Names = diet24hrAddConf$Names[i])
+}) ; names(diet24rAddConf_add) <- names(diet24hrAddConf$Names)
+
+
 
 ## append
-covarSets <- c(covarSets, add_covarset2, add_covarset3) 
+covarSets <- c(covarSets, dietEachConf_add, dietAddConf_add, diet24hrEachConf_add, diet24rAddConf_add) 
 names(covarSets)
 
 
@@ -181,17 +193,11 @@ names(covarSets)
 
 covarSetGroups <- list(
   
-  dietGroup1 = list(
-    Sets = c("dietpc1", "dietpctop5", "dietpctop10", "dietpctop15", "dietpctop20", "dietpcall"),
-    Names = c(dietpc1="Diet PC1", dietpctop5="Top 5 Diet PCs", dietpctop10="Top 10 Diet PCs", 
-                       dietpctop15 = "Top 15 Diet PCs", dietpctop20="Top 20 Diet PCs"),
-    Labels = c("Diet PC1", "Top 5 Diet PCs", "Top 10 Diet PCs", "Top 15 Diet PCs", "Top 20 Diet PCs")),
-  
-  dietGroup2 = list(
-    Sets = c(names(covarSets)[1:23]),
+  ## FFQ-based diet PCs
+  dietpcs = list(
+    Sets = c("dietpc1", paste0("dietpctop",2:23)),
     Names = c(sapply(c(1:23), function(i) covarSets[[i]]$Names)),
-    Labels =  c(sapply(c(1:23), function(i) covarSets[[i]]$Label))
-    ),
+    Labels =  c(sapply(c(1:23), function(i) covarSets[[i]]$Label))),
   
   dietEachConf = list(
     Sets = c(names(dietEachConf$Names)),
@@ -201,8 +207,25 @@ covarSetGroups <- list(
   dietAddConf = list(
     Sets = c(names(dietAddConf$Names)),
     Names = c(dietAddConf$Names),
-    Labels = as.vector(dietAddConf$Names))
-)
+    Labels = as.vector(dietAddConf$Names)),
+  
+  ## 24HR-based diet PCs
+  diet24hrpcs = list(
+    Sets = c(names(covar24hrPCs)),
+    Names = c(sapply(c(25:53), function(i) covarSets[[i]]$Names)),
+    Labels = c(sapply(c(25:53), function(i) covarSets[[i]]$Label))),
+  
+  diet24hrEachConf = list(
+    Sets = c(names(diet24hrEachConf$Names)),
+    Names = c(diet24hrEachConf$Names),
+    Labels = as.vector(diet24hrEachConf$Names)),
+  
+  diet24hrAddConf = list(
+    Sets = c(names(diet24hrAddConf$Names)),
+    Names = c(diet24hrAddConf$Names),
+    Labels = as.vector(diet24hrAddConf$Names))
+  
+  )
   
 # ==============================
 ## Descriptive variable labels
@@ -232,54 +255,13 @@ confounders1 <- c(
   waist2hip = "Waist-to-hip"
 )
 
-confounders1_num <- c(
-  smoke_level.num = "Smoking",
-  alch_freq.num = "Alcohol",
-  physact_level.num = "Physical Activity",
-  income_level.num = "Income",
-  educ_level.num = "Education",
-  bmi="BMI",
-  waist2hip = "Waist-to-hip"
-)
-
-
-# ======================================
-## Compile MR outcomes from ieuGWAS
-# ======================================
-
-outcomeVars <- list(
-  GCST90239664=list(
-    Label="log(TG)",
-    description="log(Triglyceride)",
-    gwas="Graham S, 2021",
-    var="tg_log"),
-  GCST90132314=list(
-    Label="CAD",
-    description="Coronary Artery Disease",
-    gwas="Aragam KG, 2022",
-    var="cvd"),
-  GCST90239658=list(
-    Label="LDL",
-    description="LDL Cholesterol",
-    gwas="Graham S, 2021",
-    var="ldl"),
-  GCST90319877=list(
-    Label="Cirrhosis",
-    description="Cirrhosis of Liver",
-    gwas="Ghouse J, 2024",
-    var="cir"),
-  GCST90013405=list(
-    Label="ALT",
-    description="Alanine Aminotransferase",
-    gwas="Pazoki R, 2021",
-    var="alt")
-)
 
 # ======================================
 ## Diet-trait pairs
 # ======================================
 
 diet_trait_pairs=c("alch_alt","alch_cir", "breadtype_cvd", "breadtype_ldl", "oilyfish_cvd","oilyfish_tg")
+
 pairs.l <- list(
   oilyfish_tg = list(
     exposure="oilyfish_QT",
@@ -321,6 +303,7 @@ pairs.l <- list(
 
 sets <- c("all"="All", "refined_lt20"="Refined <20%", 
           "refined_lt10"="Refined <10%", "refined_lt05"="Refined <5%")
+
 
 
 ################################################################################
@@ -479,35 +462,54 @@ pivot_Bdat_to_long <- function(Bchange.df) {
 ## Derive diet PCs without exposure diet trait
 # =================================================
 
-derive_dietPCs <- function(exposure, exclude, data=dat) {
+derive_dietPCs <- function(exposure, exclude, dietdata="24HR", data=dat) {
   
-  vars_for_pca <- data %>% select(
-    id,
-    cooked_veg_QT=cooked_veg, raw_veg_QT=raw_veg,
-    fresh_fruit_QT=fresh_fruit, dried_fruit_QT=dried_fruit, 
-    oily_fish_QT=oily_fish, nonoily_fish_QT=nonoily_fish,
-    procmeat_QT=procmeat, poultry_QT=poultry, cheese_QT=cheese,
-    beef_QT=beef, lamb_QT=lamb, pork_QT=pork, 
-    bread_type_white_vs_brown_or_whole_BIN=bread_type_white_vs_brown_or_whole, 
-    bread_intake_QT=bread_intake,
-    milk_type_full_vs_low_or_nonfat_BIN=milk_type_full_vs_low_or_nonfat,
-    cereal_type_sugar_vs_any_bran_BIN=cereal_type_sugar_vs_any_bran, 
-    cereal_intake_QT=cereal_intake,
-    spread_type_butter_vs_any_other_BIN=spread_type_butter_vs_any_other,
-    coffee_type_decaf_vs_regular_BIN=coffee_type_decaf_vs_regular, coffee_QT=coffee,
-    tea_QT=tea, water_QT=water, 
-    addsalt_always_often_vs_nrs_BIN=addsalt_always_often_vs_nrs,
-    hotdrink_temp_hot_or_vhot_vs_warm_BIN=hotdrink_temp_hot_or_vhot_vs_warm) %>%
+  ## For FFQ-based diet PCs
+  if(dietdata == "FFQ") {
+    
+    vars_for_pca <- data %>% select(id,
+      cooked_veg_QT=cooked_veg, raw_veg_QT=raw_veg,
+      fresh_fruit_QT=fresh_fruit, dried_fruit_QT=dried_fruit, 
+      oily_fish_QT=oily_fish, nonoily_fish_QT=nonoily_fish,
+      procmeat_QT=procmeat, poultry_QT=poultry, cheese_QT=cheese,
+      beef_QT=beef, lamb_QT=lamb, pork_QT=pork, 
+      bread_type_white_vs_brown_or_whole_BIN=bread_type_white_vs_brown_or_whole, 
+      bread_intake_QT=bread_intake,
+      milk_type_full_vs_low_or_nonfat_BIN=milk_type_full_vs_low_or_nonfat,
+      cereal_type_sugar_vs_any_bran_BIN=cereal_type_sugar_vs_any_bran, 
+      cereal_intake_QT=cereal_intake,
+      spread_type_butter_vs_any_other_BIN=spread_type_butter_vs_any_other,
+      coffee_type_decaf_vs_regular_BIN=coffee_type_decaf_vs_regular, coffee_QT=coffee,
+      tea_QT=tea, water_QT=water, 
+      addsalt_always_often_vs_nrs_BIN=addsalt_always_often_vs_nrs,
+      hotdrink_temp_hot_or_vhot_vs_warm_BIN=hotdrink_temp_hot_or_vhot_vs_warm) %>%
     
     # Replace missing data with median values
-    mutate_at(vars(-id), function(x) ifelse(is.na(x), median(x, na.rm=T), x)) %>%
-    
+    mutate_at(vars(-id), function(x) ifelse(is.na(x), median(x, na.rm=T), x)) 
+      
     # Winzorise
     mutate(across(where(is.numeric), ~winsorize(., SDs=5))) %>%
     filter(complete.cases(.)==T)
-  
-  if (exclude == "none") {
-    cat("Building diet patterns via pca with all diet traits ...")
+    
+    # For 24HR-based diet PCs
+  } else if (dietdata == "24HR") {
+    
+    vars_for_pca <- data %>% 
+      select(id, nut_kcal, all_of(paste0(pc_groups, "_mean"))) %>%
+      rename_with(., ~gsub("_mean", "_adjkcal", .)) %>%
+      
+      # Replace missing values with medians
+      mutate_at(vars(-id), function(x) ifelse(is.na(x), median(x, na.rm=T), x)) %>%
+      
+      # Apply energy-adjustment
+      #mutate_at(paste0(pc_groups, "_adjkcal"), ~ resid(lm(.x ~ nut_kcal), data=.)) %>%
+      
+      # Remove total energy variable
+      select(-nut_kcal)
+    
+  } ; if (exclude == "none") {
+    
+    cat("Building diet patterns via pca with all diet traits from", dietdata, "data ...")
     vars_for_pca <- vars_for_pca } else {
       cat(paste0("Building diet patterns via pca, excluding ", exclude))
       vars_for_pca <- vars_for_pca %>% select(-(starts_with(exclude)))
@@ -518,7 +520,13 @@ derive_dietPCs <- function(exposure, exclude, data=dat) {
   
   ## Extract scores
   diet_pcs.scores <- cbind.data.frame(vars_for_pca$id, diet_pcs$x)
-  names(diet_pcs.scores) <- c("id", paste0("dietPC", 1:ncol(diet_pcs$x)))
+  
+  if(dietdata == "FFQ") { 
+    names(diet_pcs.scores) <- c("id", paste0("dietPC", 1:ncol(diet_pcs$x))) 
+  } else if(dietdata == "24HR") {
+    names(diet_pcs.scores) <- c("id", paste0("diet24hrPC", 1:ncol(diet_pcs$x))) 
+    }
+  
   
   return(list(pcs=diet_pcs, scores=diet_pcs.scores))
   
