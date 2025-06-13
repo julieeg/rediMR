@@ -162,10 +162,6 @@ diet_means <- diet_means %>% mutate(
 diet_means %>% fwrite("../data/processed/ukb_diet24hr.csv")
 diet_means %>% saveRDS("../data/processed/ukb_diet24hr.rda")
 
-
-
-
-
   
 # Write function to build food groups
 build_foodgroup <- function(food_group_data, food_group, codebook=codebook) {

@@ -1,6 +1,6 @@
 #!/bin/bash
-#$ -l h_vmem=30G
-#$ -l h_rt=1:00:00
+#$ -l h_vmem=20G
+#$ -l h_rt=0:30:00
 #$ -o reports/
 
 #$ -cwd
@@ -16,7 +16,7 @@ tag=$5 #vCole
 phenofile=../data/processed/ukb_phenos_unrelated_EUR_withJC_diet_traits_09292024.txt 
 covars_gwas="age sex gPC1 gPC2 gPC3 gPC4 gPC5 gPC6 gPC7 gPC8 gPC9 gPC10"
 
-saveDir=../data/processed/rediMR/vCole/${exposure}_${outcome}
+saveDir=../data/processed/rediMR/${exposure}_${outcome}
 mkdir -p $saveDir
 
 ## Load resources
@@ -46,10 +46,10 @@ if(endsWith("${sumstatsfile}", ".csv")) {
   "sumstats is a csv --> converting to txt"
   ss %>% fwrite(gsub("csv", "txt", "${sumstatsfile}"), sep=" ") } else{
     "sumstats is a txt --| No conversion required."
-  } ; ss %>% select("snp.exposure") %>% fwrite("${saveDir}/${exposure}_${outcome}.snpsInput", sep=" ", col.names=F)
+  } ; ss %>% select("snp.exposure") %>% fwrite("${saveDir}_${tag}.snpsInput", sep=" ", col.names=F)
 EOF
 
-snp_list=${saveDir}/${exposure}_${outcome}.snpsInput
+snp_list=${saveDir}_${tag}.snpsInput
 
 
 ############################################
@@ -73,7 +73,7 @@ done ; cat-bgen -g ${scratch}/${exposure}_${outcome}_snps_chr*_${tag}.bgen -og $
 --freq \
 --rm-dup force-first \
 --memory 50000 \
---out ${saveDir}/${exposure}_${outcome}_snpsInput \
+--out ${saveDir}_${tag}_snpsInput \
 && rm ${scratch}/${exposure}_${outcome}_snps_${tag}.bgen 
 
 

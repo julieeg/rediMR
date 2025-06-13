@@ -1,19 +1,20 @@
-## Gather list of variables in May 2023 pull
-
-#!# NOT yet RUN THROUGH WITH UPDATED SYNTAX
-
-# load packages
-library(tidyverse)
-library(data.table)
+## Prepare UKB phenotype data
+## Last updated: 20205-06-04
 
 
-## load basic functions for data preparation & cleaning
+############
+## Set Up ##
+############
+
+# load basic packages & functions for data prep & cleaning
+library(tidyverse) ; library(data.table)
 source("../scripts/basic_functions.R")
 
 
 # ========================
 ## Winsorize data by SD
 # ========================
+
 winsorize <- function(x, SDs=5) {
   bounds <- mean(x, na.rm=T) + SDs * c(-1, 1) * sd(x, na.rm=T)
   x <- ifelse(x<bounds[1], bounds[1], ifelse(x>bounds[2], bounds[2], x))
@@ -45,25 +46,23 @@ descr_label_ordered.fun <- function(data, base_var, labs_vals) {
 }
 
 
-
-
-########################################
-## Demographic & Lifestyle variables  ##
-########################################
+#######################################################
+## Load & prepare demographic & Lifestyle variables  ##
+#######################################################
 
 print("Gathering demographic and lifestyle variables ...")
 
-base_phenos <- fread("/humgen/florezlab/UKBB_app27892/UKBB_app27892_download_BEFORE_aug_2022/ukb10528.tab.gz", 
-                      data.table=FALSE, stringsAsFactors=FALSE)
 
-
-### Basic phenotypes -----------------------------------------------f
+### Basic phenotypes ------------------
 
 female_labs <- list("Female" = 0, "Male" = 1)
 smoke_labs <- list("No answer"=-3, "Never"=0, "Former"=1, "Current"=2)
 smoking_num <- c("0" = 0, "1" = 1, "2" = 2, "-9" = -3)
 med_mets_labs <- list("Cholesterol lowering" = 1, "Blood pressure" = 2, "Insulin" = 3,
-  "None of the above" = -7, "Do not know" = -1, "Prefer not to answer" = -3)
+                      "None of the above" = -7, "Do not know" = -1, "Prefer not to answer" = -3)
+
+base_phenos <- fread("/humgen/florezlab/UKBB_app27892/UKBB_app27892_download_BEFORE_aug_2022/ukb10528.tab.gz", 
+                     data.table=FALSE, stringsAsFactors=FALSE)
 
 base_phenos_id <- base_phenos %>% 
   select(id = f.eid,
@@ -72,36 +71,40 @@ base_phenos_id <- base_phenos %>%
          sex = f.31.0.0,
          age = f.21022.0.0,
          bmi = f.21001.0.0,
-         sbp = f.4080.0.0,
-         dbp = f.4079.0.0,
          waist = f.48.0.0,
-	 hip = f.49.0.0,
-         fasting_hrs = f.74.0.0,
-         med_code = f.20003.0.0,
-         med_mets = f.6177.0.0,
+         hip = f.49.0.0,
          smoking = f.20116.0.0) %>%
   mutate(
     female.lab = descr_label.fun(., "sex", female_labs),
     smoke.lab = descr_label.fun(., "smoking", smoke_labs),
     smoking.num = descr_label.fun(., "smoking", smoking_num),
-    meds.lab = descr_label.fun(., "med_mets", med_mets_labs),
-    waist2hip = waist/hip)
-
-
+    waist2hip = waist/hip) %>%
+  mutate(
+    smoke_level.lab = factor(case_when(
+      smoke.lab == "No answer" ~ as.character(NA),
+      smoke.lab != "No answer" ~ as.character(smoke.lab),
+      TRUE ~ as.character(NA)),
+      levels = c("Current", "Former", "Never"))
+    )
 
 withdrawn_consent <- scan("/humgen/florezlab/UKBB_app27892/withdraw/withdraw27892_232_14_Nov_2022.txt", what=character())
 
 
-### Additional smoking variable --------------
+## Add Assessment Center ------------------
 
-addn_smoke_id <- fread("/humgen/florezlab/UKBB_app27892/UKBB_app27892_download_BEFORE_aug_2022/ukb45575.tab.gz", 
-                       data.table=FALSE, stringsAsFactors=FALSE) %>%
-  select(id=f.eid,
-         cigarettes_per_day = f.6183.0.0)
+ac_labs <- list("Barts"=11012, "Birmingham" = 11021, "Bristol" =	11011, "Bury" =	11008, 
+                "Cardiff" =	11003, "Cheadle (revisit)" =	11024, "Croydon" =	11020, 
+                "Edinburgh" =	11005, "Glasgow" = 11004, "Hounslow" = 11018, "Leeds" = 11010,
+                "Liverpool"=11016, "Manchester"=11001, "Middlesborough"=11017, "Newcastle" =11009, 
+                "Nottingham"=11013, "Oxford"=11002, "Reading"=11007, "Sheffield"=11014, "Stockport (pilot)"=10003,
+                "Stoke"=11006, "Swansea"=	11022,"Wrexham" =11023, "Cheadle (imaging)"=11025,
+                "Reading (imaging)"=11026, "Newcastle (imaging)" =11027, "Bristol (imaging)"=11028)
+
+base_phenos_id <- base_phenos_id %>% 
+  mutate(ac.f = descr_label.fun(., "ac", ac_labs))
 
 
-
-### Education level ---------------------------------------------------
+### Education level ------------------
 
 ## Coding based on: Ge T., et al. Cerebral Cortex 2019;29(8): 3471-3481.
 
@@ -116,17 +119,28 @@ educ_level_labs <- list(
   "Other professional qualifications" = 6)
 
 educ_isced_level_labs <- list("Level 5" = 1, "Level 3" = 2, "Level 2" = 3, 
-  "Level 2" = 4, "Level 5" = 5, "Level 4" = 6, "Level 1" = -7)  # NA = -3 or missing
-
-educ_years_labs <- list("20"=1, "13"=2, "10"=3, "10"=4, "19"=5, "15"=6, "7"=-7)
-
+                              "Level 2" = 4, "Level 5" = 5, "Level 4" = 6, "Level 1" = -7)  # NA = -3 or missing
 
 educ_id <- fread("/humgen/florezlab/UKBB_app27892/UKBB_app27892_download_may_2023/ukb672670.tab.gz",
-                  data.table = FALSE, stringsAsFactors = FALSE) %>%
-              select(id = f.eid, educ_level = f.6138.0.0) %>%
+                 data.table = FALSE, stringsAsFactors = FALSE) %>%
+  select(id = f.eid, educ_level = f.6138.0.0) %>%
   mutate(educ_level.lab = descr_label.fun(., "educ_level", educ_level_labs),
-         educ_isced.lab = descr_label.fun(., "educ_level", educ_isced_level_labs),
-         educ_years = as.numeric(descr_label.fun(., "educ_level", educ_years_labs))
+         educ_isced.lab = descr_label.fun(., "educ_level", educ_isced_level_labs)) %>% 
+  mutate(
+    educ_level.lab = case_when(
+      educ_level.lab == "Prefer not to answer" ~ as.character(NA),
+      educ_level.lab != "Prefer not to answer" ~ as.character(educ_level.lab),
+      TRUE ~ as.character(NA))) %>% 
+  mutate(
+    #Edu levels & yrs based on: https://www.nature.com/articles/s41380-019-0596-9#MOESM1)
+    educ_level.lab = factor(educ_level.lab, levels = c(
+      "College or university degree", # ~20yrs 
+      "NVQ/HND or equivalent", # 2 of 3 years bachelor's degree ~19yrs
+      "Other professional qualifications", # e.g., nursing degree, teaching degree ~ 15yrs
+      "A/AS levels or equivalent", # 1 year bachelor's degree ~13yrs
+      "O/GCSE levels or equivalent", # HS + Associates degree ~10yrs
+      "CSEs or equivalent", # completed HS ~10yrs
+      "None of the above")) #~7yrs
   )
 
 
@@ -172,10 +186,9 @@ alch_id <- fread("/humgen/florezlab/UKBB_app27892/UKBB_app27892_download_aug_202
   mutate(alch_freq.lab = descr_label.fun(., "alch_freq", alch_freq_labs),
          alch_freq.num = descr_label.fun(., "alch_freq", alch_num)) %>%
   mutate(alch_freq.lab = factor(alch_freq.lab, levels= c(names(alch_freq_labs)[-1]) )) %>%
-  select(id, alch_freq.num, alch_freq.lab, alch_drinker_status, alch_drinker_status.lab, alch_drinks_per_week, alch_gm_per_wk)
-
-
-
+  select(id, alch_freq.num, alch_freq.lab, alch_drinker_status, alch_drinker_status.lab, alch_drinks_per_week, alch_gm_per_wk) 
+  
+ 
 ### Physical Activity -------------------------------------------
 
 pa_fields <- c("walking_dur", "walking_frq", "moderate_dur", "moderate_frq",
@@ -244,273 +257,53 @@ income_id <- fread("/humgen/florezlab/UKBB_app27892/UKBB_app27892_download_may_2
 income_id <- income_id %>%
   mutate(income = income_coding[as.character(f.738.0.0)]) %>%
   select(id=f.eid, income) %>%
-  mutate(income_level = case_when(income == "Do not know" ~ mode(NA),
+  mutate(income_level.lab = case_when(income == "Do not know" ~ mode(NA),
                                   income == "Prefer not to answer" ~ as.character(NA),
-                                  income != "Do not know" & income != "Prefer not to answer" ~ as.character(income)))
+                                  income != "Do not know" & income != "Prefer not to answer" ~ as.character(income))) %>%
+  mutate(income_level.lab = factor(income_level.lab, levels = c(
+    "Less than 18,000", "18,000 to 30,999", "31,000 to 51,999", "52,000 to 100,000", "Greater than 100,000"),
+    labels = c("lt_18000", "from_18000_to_30999", "from_31000_to_51999", "from_52000_to_100000",  "gt_100000"))
+  )
+    
 
 
+#################################################
+##   COMBINE all base + covariate variables    ##
+#################################################
 
-### Additional & medication variables ----------------------------
-
-meds_female_labs = c("Cholesterol lowering" = 1, "Blood pressure" = 2, "Insulin" = 3, "Hormone replacement therapy" = 4, 
-                     "Oral contraceptive pill" = 5, "None of the above" = -7)
-meds_male_labs = c("Cholesterol lowering" = 1, "Blood pressure" = 2, "Insulin" = 3, 
-                   "None of the above" = -7)
-
-addn_id <- fread("/humgen/florezlab/UKBB_app27892/UKBB_app27892_download_BEFORE_aug_2022/ukb45575.tab.gz", 
-                 data.table=FALSE, stringsAsFactors=FALSE) %>%
-  select(id=f.eid, 
-         cigarettes_per_day = f.6183.0.0,
-         meds_male = f.6177.0.0)
-
-addn_med_id <- fread("/humgen/florezlab/UKBB_app27892/UKBB_app27892_download_aug_2022/ukb669176.tab.gz", 
-                     data.table=FALSE, stringsAsFactors=FALSE) %>% 
-  select(id = f.eid, meds_female = f.6153.0.0)
-
-addn_all_id <- addn_id %>% full_join(addn_med_id, by = "id") %>%
-  mutate(across(c(meds_male, meds_female), ~ifelse(. %in% c(-3, -1) | is.na(.) == T, NA, .))) %>%
-  mutate(meds_male.lab = descr_label.fun(., "meds_male", meds_male_labs),
-         meds_female.lab = descr_label.fun(., "meds_female", meds_female_labs)) %>%
-  mutate_at("cigarettes_per_day", ~ifelse(.==-10, 0.5, ifelse(. == -1, NA, .))) %>%
-  select(id, cigarettes_per_day, meds_male, meds_male.lab, meds_female, meds_female.lab)
-
-
-#### COMBINE all base + covariate variables
 phenos_id <- base_phenos_id %>% 
   full_join(educ_id, by = "id") %>%
-  full_join(alch_freq_id, by = "id") %>%
+  full_join(alch_id, by = "id") %>%
   full_join(pa_id, by = "id") %>%
-  full_join(income_id, by = "id") %>%
-  full_join(addn_all_id, by = "id")
-
+  full_join(income_id, by = "id")
 
 
 print(paste0("DONE: Basic phenotypes prepared for", nrow(base_phenos_id), " participants"))
 
 
-############################################
-##  Recode character variables as factors ##
-############################################
+# ====================================================================
+## Prepare FFQ dietary data 
+# ====================================================================
 
-paste("Recoding character variables as meaningful factors ...")
+## Vectors of FFQ variables --------------------
 
-phenos_id <- phenos_id %>%   
-  # Recode no answer/do not know/missing as missing
-  mutate(
-    sex = case_when(sex == 1 ~ "Male", sex == 0 ~ "Female"),
-    smoke_level.lab = case_when(
-      smoke.lab == "No answer" ~ as.character(NA),
-      smoke.lab != "No answer" ~ as.character(smoke.lab),
-      TRUE ~ as.character(NA)),
-    alch_freq.lab = case_when(
-      alch_freq.lab == "Prefer not to answer" ~ as.character(NA),
-      alch_freq.lab != "Prefer not to answer" ~ as.character(alch_freq.lab),
-      TRUE ~ as.character(NA)),
-    income_level.lab=case_when(
-      income == "Prefer not to answer" ~ as.character(NA),
-      income == "Do not know" ~ as.character(NA),
-      income != "Prefer not to answer" & income != "Do not know" ~ as.character(income),
-      TRUE ~ as.character(NA)),
-    educ_level.lab = case_when(
-      educ_level.lab == "Prefer not to answer" ~ as.character(NA),
-      educ_level.lab != "Prefer not to answer" ~ as.character(educ_level.lab),
-      TRUE ~ as.character(NA))) %>% 
-  # Add descritptive labels & levels
-  mutate(
-    income_level.lab = factor(income_level.lab, 
-                              levels = c("Less than 18,000", "18,000 to 30,999",
-                                         "31,000 to 51,999", "52,000 to 100,000",  
-                                         "Greater than 100,000"),
-                              labels = c("lt_18000", "from_18000_to_30999",
-                                         "from_31000_to_51999", "from_52000_to_100000",  
-                                         "gt_100000")),
-    #Edu levels & yrs based on: https://www.nature.com/articles/s41380-019-0596-9#MOESM1)
-    educ_level.lab = factor(educ_level.lab, 
-                            levels = c("College or university degree", # ~20yrs 
-                                       "NVQ/HND or equivalent", # 2 of 3 years bachelor's degree ~19yrs
-                                       "Other professional qualifications", # e.g., nursing degree, teaching degree ~ 15yrs
-                                       "A/AS levels or equivalent", # 1 year bachelor's degree ~13yrs
-                                       "O/GCSE levels or equivalent", # HS + Associates degree ~10yrs
-                                       "CSEs or equivalent", # completed HS ~10yrs
-                                       "None of the above")), #~7yrs
-    smoke_level.lab = factor(smoke_level.lab, levels = c("Current", "Former", "Never")),
-    alch_freq.lab = factor(alch_freq.lab, ordered = T,
-                           levels = c("Daily or almost daily",
-                                      "3-4 per week", "1-2 per week", "1-3 per month",
-                                      "Special occasions only", "Never")),
-    pa_met_excess_level.lab = factor(pa_met_excess_lvl, ordered = T,
-                                     levels = c("Low", "Moderate", "High")))
+intake_fields <- c(
+  cooked_veg = 1289, raw_veg = 1299, fresh_fruit = 1309, dried_fruit = 1319,
+  bread_intake = 1438, bread_type = 1448, water = 1528, milk_type = 1418, 
+  spread_type = 1428, spread_type_nonbutter=2654, cereal_intake = 1458, cereal_type = 1468,
+  addsalt=1478, tea=1488, coffee = 1498, coffee_type = 1508, hotdrink_temp = 1518
+) 
 
-
-################
-## Biomarkers ##
-################
-print("Preparing biomarker & T2D phenotypes ...")
-
-## Biochemical parameters ---------------------------------
-
-biomark_fields <- c(
-  chol = 30690, tg = 30870, ldl = 30780, hdl = 30760, glu = 30740, hba1c = 30750, crp = 30710
-) ; biomark_vars <- setNames(paste0("f.", biomark_fields, ".0.0"), names(biomark_fields))
-
-biomark_id <- fread("/humgen/florezlab/UKBB_app27892/UKBB_app27892_download_BEFORE_aug_2022/ukb28679.tab.gz",
-                 data.table=TRUE, stringsAsFactors = FALSE) %>%
-  select(id = f.eid, 
-         all_of(biomark_vars))
-
-
-## Protein markers: GLP-1
-# glp1 <- c(glp1 = 1176)
-
-
-############################################
-## T2D (Eastwood algorithm + HbA1c < 5.7) ##
-############################################
-
-t2d <- fread("../data/raw/UKB_Diabetes.csv", data.table=FALSE, stringsAsFactors=FALSE) %>% 
-  rename(id = f.eid) %>%
-  select("id", starts_with(c("probable", "possible")), "agedm_ts_or_ni_all", 
-         "meds_any_sr_ni_all", "meds_any_sr_ni_ts_all", "dm_unlikely_all") %>% 
-  left_join(fread("../data/raw/UKB_HbA1c.csv") %>% rename(id=f.eid) %>%
-              select("id", "hba1c.30750.NGSP.max"),
-            by = "id") %>% 
-  left_join(fread("../data/raw/UKB_ICD10DM.csv") %>% rename(id=f.eid), 
-            by = "id")
-
-t2d_id <- t2d %>% mutate(
-  t2d_med_any = case_when(
-    meds_any_sr_ni_all == 1 ~ 1, 
-    meds_any_sr_ni_ts_all == 1 ~ 1,
-    meds_any_sr_ni_all == 0 & meds_any_sr_ni_ts_all == 0 ~ 0
-  )) %>% 
-  mutate(
-    t2d_case = case_when(
-      possible_t2dm_all == 1 ~ 1, 
-      probable_t2dm_all == 1 ~ 1,
-      hba1c.30750.NGSP.max >= 6.5 & possible_t1dm_all != 1 & probable_t1dm_all != 1 & dm_main != 1 & dm_secondary != 1 ~ 1,
-      hba1c.30750.NGSP.max < 5.7 & dm_unlikely_all == 1 & dm_main != 1 & dm_secondary != 1 & t2d_med_any != 1 ~ 0,
-      TRUE ~ as.numeric(NA)
-    )) %>%
-  mutate(
-    t2d_case.f = case_when(
-      as.numeric(t2d_case) == 0 ~ "Control",
-      as.numeric(t2d_case) == 1 ~ "Case"),
-    t2d_age_diagnosis = agedm_ts_or_ni_all
-  ) %>%
-  select("id", "t2d_case", "t2d_case.f", "hba1c_max"="hba1c.30750.NGSP.max", 
-         "t2d_med_any", "t2d_age_diagnosis") 
-
-
-print(paste0("DONE: Biochemical & anthropometric phenotypes prepared for ", nrow(t2d_id), " participants: ",
-             "T2D Cases = ",  paste0(table(t2d_id$t2d_case.f))[1], ";",
-            "T2D Controls = ", paste0(table(t2d_id$t2d_case.f))[2])
-      )
-
-
-##################################################
-##  Diet from FFQs & Nutrient intakes from FFQ  ## 
-##################################################
-print("Preparing dietary data ...")
-
-
-### Functions to prepare 24HR data across multiple measurements (4/1 year)
-
-fetch_diet_fields <- function(fieldIDs, df, coding=FALSE) {
-  # Given a list of fields constituting a food group:
-  # - Determine the set of 24HR that are valid for that food group
-  # - Recode the relevant variables based on their codings if necessary
-  # - Sum over all fields for that food group within each instance
-  # - Take the mean food group quantity over all instances
-  diet_field_df <- lapply(0:4, function(i) {
-    tcals_field <- paste0("f.26002.", i, ".0")  # Variable name for total calories in instance "i" 
-    typical_diet_field <- paste0("f.100020.", i, ".0")  # Variable name for typical diet in instance "i" 
-    valid_24hr <- (findInterval(df[[tcals_field]] / 4.18, c(600, 4800)) == 1) &
-      df[[typical_diet_field]] == 1
-    instance_fields <- paste0("f.", fieldIDs, ".", i, ".0")  # Variable names for all fields in instance "i"
-    instance_df <- df[, instance_fields, drop=FALSE]
-    if (coding) {  # Recode the variable if necessary (for food groups)
-      instance_df <- mutate_all(instance_df, ~codings[as.character(.)])
-    }
-    ifelse(valid_24hr,  # Sum over fields if valid 24HR, else NA
-           rowSums(instance_df, na.rm=TRUE), NA) } ) %>%
-    setNames(paste0("instance", 0:4)) %>%
-    bind_cols()
-  diet_mean <- rowMeans(diet_field_df, na.rm=TRUE)
-  ifelse(is.nan(diet_mean), NA, diet_mean)
-}
-
-check_num_valid_24hr <- function(df) {
-  valid_24hr_df <- lapply(0:4, function(i) {
-    tcals_field <- paste0("f.26002.", i, ".0")  # Variable name for total calories in instance "i" 
-    typical_diet_field <- paste0("f.100020.", i, ".0")  # Variable name for typical diet in instance "i" 
-    valid_24hr <- (findInterval(df[[tcals_field]] / 4.18, c(600, 4800)) == 1) &
-      df[[typical_diet_field]] == 1
-    valid_24hr
-  }) %>%
-    setNames(paste0("instance", 0:4)) %>%
-    bind_cols()
-  rowSums(valid_24hr_df, na.rm=TRUE)
-}
-
-
-# nutrient variables
-diet_vars <- c("TCALS", "CHO", "FAT",  "MUFA", "SFA", "PUFA", "PRO", 
-               "ALC", "FIBER",  "CHO2FIB", "CHO2FIB_log", "FIB2CHO", "FIB2CHO_sqrt")
-
-## merge "Typical diet yesterday" with nutrient intake vars 
-diet_id <- left_join(fread("/humgen/florezlab/UKBB_app27892/UKBB_app27892_download_aug_2022/ukb670995.tab.gz", 
-                        data.table=FALSE, stringsAsFactors=FALSE),
-                      fread("/humgen/florezlab/UKBB_app27892/UKBB_app27892_download_BEFORE_aug_2022/ukb22861.tab.gz",
-                            data.table=FALSE, stringsAsFactors = FALSE) %>% 
-                        select(f.eid, starts_with("f.100020")),
-                      by = "f.eid") %>%
-  
-  mutate(CHO = fetch_diet_fields("26013", .),
-         SFA = fetch_diet_fields("26014", .),
-         MUFA = fetch_diet_fields("26032", .),
-         PUFA_N3 = fetch_diet_fields("26015", .),
-         PUFA_N6 = fetch_diet_fields("26016", .),
-         PRO = fetch_diet_fields("26005", .),
-         FAT = fetch_diet_fields("26008", .),
-         ALC = fetch_diet_fields("26030", .),
-         FIBER = fetch_diet_fields("26017", .),
-         num_recalls = check_num_valid_24hr(.),
-         ) %>%
-  
-  mutate(PUFA = PUFA_N3+PUFA_N6,
-         
-         #diet quality measures: CHO / FIBER ratios
-         CHO2FIB = ifelse(FIBER >0, CHO / FIBER, NA),
-         FIB2CHO = FIBER / CHO) %>% 
-  
-  mutate(
-    "CHO2FIB_sqrt" = sqrt(CHO2FIB), "FIB2CHO_sqrt" = sqrt(FIB2CHO),
-    "CHO2FIB_log" = log(CHO2FIB), "FIB2CHO_log" = log(FIB2CHO)) %>%
-
-  mutate(TCALS = (CHO*4 + PRO*4 + FAT*9)) %>%
-  select(id=f.eid, all_of(diet_vars))
-
-
-#### food frequency questionnaires
-
-intake_fields <- c(cooked_veg = 1289, raw_veg = 1299,
-                   fresh_fruit = 1309, dried_fruit = 1319,
-                   bread_intake = 1438, bread_type = 1448, 
-                   water = 1528, milk_type = 1418, spread_type = 1428,
-                   spread_type_nonbutter=2654,
-                   cereal_intake = 1458, cereal_type = 1468,
-                   addsalt=1478, tea=1488, coffee = 1498, coffee_type = 1508,
-                   hotdrink_temp = 1518) #**non_butter_spread_type
-
-freq_fields <- c(oily_fish = 1329, nonoily_fish = 1339,
-                 procmeat = 1349, poultry = 1359, cheese = 1408,
-                 beef = 1369, lamb = 1379, pork = 1389)
+freq_fields <- c(
+  oily_fish = 1329, nonoily_fish = 1339, procmeat = 1349, poultry = 1359, cheese = 1408,
+  beef = 1369, lamb = 1379, pork = 1389
+)
 
 ffq_fields<-c(intake_fields, freq_fields)
 ffq_vars <- setNames(paste0("f.", ffq_fields, ".0.0"), names(ffq_fields))
 
 
-# function to convert frequency values to servings/day (from KEW)
+## Function to convert frequency values to servings/day (from KEW) --------------------
 
 ffq_freq_to_sev <- function(x) {
   case_when(  # Data-coding 100377
@@ -525,7 +318,7 @@ ffq_freq_to_sev <- function(x) {
 }
 
 
-# function to recode negative values as meaninginful
+# function to recode negative values as meaninginful --------------------
 
 neg_to_num <- function(x) {
   #x <- as.double(x) #"double" required to add values with decimals (previously, integer)
@@ -537,7 +330,8 @@ neg_to_num <- function(x) {
 }
 
 
-# compile ffq variables & add total variables    
+# compile ffq variables & add total variables  --------------------
+
 ffq_id <- base_phenos %>% select(id=f.eid, all_of(ffq_vars)) %>%
   mutate(whole_bread = case_when(
     bread_type == 3 ~ 1,
@@ -546,15 +340,11 @@ ffq_id <- base_phenos %>% select(id=f.eid, all_of(ffq_vars)) %>%
   )) %>%
   mutate(across(names(freq_fields), ffq_freq_to_sev)) %>%
   mutate(across(names(intake_fields), neg_to_num)) %>%
-  mutate(total_veg = cooked_veg + raw_veg,
-         total_fruit = fresh_fruit + dried_fruit,
-         total_fish = oily_fish + nonoily_fish,
-         red_meat = beef + lamb + pork,
-         bread_intake = bread_intake / 7, # bread intake was provided in slices/week
+  mutate(bread_intake = bread_intake / 7, # bread intake was provided in slices/week
          cereal_intake = cereal_intake / 7 # cereal intake was provided in bowls/week)
-         ) %>%
+         
+  ) %>% # Add FFQ vars for PCA
   
-  # Add FFQ vars for PCS
   mutate(
     bread_type_white_vs_brown_or_whole = case_when(      
       bread_type == 1 ~ 1, bread_type == 2 | bread_type == 3 | 
@@ -577,80 +367,197 @@ ffq_id <- base_phenos %>% select(id=f.eid, all_of(ffq_vars)) %>%
       addsalt == 3 | addsalt == 4 ~ 1, addsalt == 1 | addsalt == 2 ~ 0, TRUE ~ as.numeric(NA)),
     hotdrink_temp_hot_or_vhot_vs_warm = case_when(
       hotdrink_temp == 1  ~ 1, hotdrink_temp == 3 | hotdrink_temp == 2 ~ 0, TRUE ~ as.numeric(NA))
-    )
+  )
+
+ffq_id %>% saveRDS("../data/processed/ukb_ffq_processed.rda")
 
 
-## Add descriptive levels to categorical traits
 
-ffq_id <- ffq_id %>% 
-  mutate(
-    bread_type.lab = case_when(
-      bread_type == 1 ~ "White", bread_type == 2 ~ "Brown", bread_type == 3 ~ "Wholemeal/Wholegrain",
-      bread_type == 4 ~ "Other", bread_type == -1 ~ "Do not know", bread_type == -3 ~ "Prefer not to answer",
-      TRUE ~ as.character(NA)),
-    
-    milk_type.lab = case_when(
-      milk_type == 1 ~ "Full cream", milk_type == 2 ~ "Semi-skimmed", milk_type == 3 ~ "Skimmed",
-      milk_type == 4 ~ "Soy", milk_type == 5 ~ "Other", milk_type == 6 ~ "Never/rarely have milk",
-      milk_type == -1 ~ "Do not know", milk_type == -3 ~ "Prefer not to answer", 
-      TRUE ~ as.character(NA)),
-    
-    spread_type.lab = case_when(
-      spread_type == 1 ~ "Butter/spreadable butter", spread_type == 2 ~ "Flora Pro-Active/Benecol",
-      spread_type == 3 ~ "Other spread/margarine", spread_type == 0 ~ "Never/rarely use spread",
-      spread_type == -1 ~ "Do not know", spread_type == -3 ~ "Prefer not to answer"),
-    
-    spread_type_nonbutter.lab = case_when(
-      spread_type_nonbutter == 4 ~	"Soft (tub) margarine", spread_type_nonbutter == 5 ~	"Hard (block) margarine",
-      spread_type_nonbutter == 6 ~	"Olive oil based spread (eg: Bertolli)",
-      spread_type_nonbutter == 7 ~	"Polyunsaturated/sunflower oil based spread (eg: Flora)",
-      spread_type_nonbutter == 2 ~	"Flora Pro-Active or Benecol",
-      spread_type_nonbutter == 8 ~	"Other low or reduced fat spread",
-      spread_type_nonbutter == 9 ~ "Other type of spread/margarine", spread_type_nonbutter == -1 ~	"Do not know",
-      spread_type_nonbutter == -3 ~	"Prefer not to answer"),
-    
-    cereal_type.lab = case_when(
-      cereal_type == 1 ~ "Bran cereal (e.g. All Bran, Branflakes)", cereal_type == 2 ~ "Biscuit cereal (e.g. Weetabix)",
-      cereal_type == 3 ~ "Oat cereal (e.g. Ready Brek, porridge)", cereal_type == 4 ~ "Muesli",
-      cereal_type == 5 ~ "Other (e.g. Cornflakes, Frosties)", cereal_type == -1 ~ "Do not know",
-      cereal_type == -3 ~ "Prefer not to answer"),
-    
-    coffee_type.lab = case_when(
-      coffee_type == 1 ~ "Decaffeinated coffee (any type)", coffee_type == 2 ~ "Instant coffee",
-      coffee_type == 3 ~ "Ground coffee (include espresso, filter etc)", coffee_type == 4 ~ "Other type of coffee",
-      coffee_type == -1 ~ "Do not know", coffee_type == -3 ~ "Prefer not to answer"),
-    
-    addsalt.lab = case_when(
-      addsalt == 1 ~ "Never/Rarely", addsalt == 2 ~ "Sometimes", addsalt == 3 ~ "Often",
-      addsalt == 4 ~ "Always", TRUE ~ as.character(NA)),
-    
-    hotdrink_temp.lab = case_when(
-      hotdrink_temp == 1 ~ "Very hot", hotdrink_temp == 2 ~ "Hot", hotdrink_temp == 3 ~ "Warm",
-      TRUE ~ as.character(NA))
-    )
+# ====================================================================
+## Prepare 24HR dietary data 
+# ====================================================================
+
+## From Cole et al., Heritability:
+#A detailed 24HR questionnaire in which a subset of participants answered over 200 questions 
+#on specific foods and beverages consumed (with quantities) in the preceding 24-hour day. 
+#The 24HR was implemented as a questionnaire for the final 70 K in-person baseline assessment
+#center participants from 2009–2010 and emailed four times to 320 K participants who consented 
+#to re-contact via email between February 2011 and April 2012. Approximately 200 K individuals 
+#have at least one and up to five recorded 24HR questionnaires.
+
+#Each questionnaire was filtered for credible estimates of total energy intake 
+#[≥1,000 kJ (UKB field 100002) and ≤20 MJ for males and ≤18 MJ for females (UKB field 100026)],
+#typical dietary intake (UKB fields 100020 and 20085), completion duration greater than or 
+#equal to 5 min (UKB field 20082), and overall completion (UKB field 20081). Additionally, 
+#the participant could not be pregnant within 1 year of taking the 24HR nor have a cancer 
+#diagnosis within the previous year (UKB fields 3,140 and 40005). All 24HR questions were 
+#converted into 1/0 for yes/no to consumption; each categorical response was coded similarly
+#[e.g., UKB field 20086 for special diet was converted into six binary variables for each response
+#(gluten-free, lactose-free, low calorie, vegetarian, vegan, and a combined vegetarian or vegan field)]. 
+#24HR questions pertaining to quantity consumed were also included as continuous variables.
 
 
-## Combine diet datasets --------------------------------------------------
+# ===================================
+##  Load 24HR & helper data files 
+# ===================================
 
-diet_all_id <- diet_id %>% 
+cat("Loading 24HR data ...\n")
+
+path_to_24hr="/humgen/florezlab/UKBB_app27892/UKBB_app27892_download_jul_2024/ukbb_app27892_diet_07242024.csv"
+
+# 24hr data
+diet24hr=fread(path_to_24hr) %>% rename(id = eid)
+
+## ids for participants who withdrew consent
+withdraw=scan("/humgen/florezlab/UKBB_app27892/withdraw/w27892_20241217.csv", what=character()) #488
+
+diet24hr <- diet24hr %>% filter(!id %in% withdraw)
+
+codebook=readxl::read_excel("../run/ukb_24hr_codebook.xlsx")
+
+
+
+##########################
+##  24HR data cleaning  ##
+##########################
+
+## Used pre-calculated food group weights (g) by UKB, from 24-hour recalls, as described
+# in https://link.springer.com/article/10.1007/s00394-021-02535-x (N=93 food groups)
+
+## Data cleaning
+# -restrict plausible total energy intakes (Cole: 1000 kj/day & <20,000kj [M] or <18000 kj [F])
+# -restrict to typical_diet_yesterday
+# -restrict to >= 5 min completion time
+# -restrict to overall completion (yes)
+
+# ======================================================================
+## Restrictions: typical diet, plausible total energy, complete data
+# ======================================================================
+
+diet_valid_mean <- function(field, df) {
+  # For a given nutrient:
+  # - Select all columns for that nutrient
+  # - Tabule number of instances (not missing)
+  # - if >=2 instances, calculate mean; if not, code as NA
+  diet_fields_df <- lapply(0:4, function(i) {
+    field_id <- paste0("p", field,"_i", i) # diet field 
+    valid_field <- paste0("p100026_i", i) # ukb field for valid 24hr (energy & sex)
+    typical_field <- paste0("p100020_i", i) # ukb field for typical diet yesterday
+    reason_field <- paste0("p20085_i", i) # ukb field for reason for atypical diet
+    duration_field <- paste0("p20082_i", i) # ukb field for time duration of 24hr
+    valid_24hr <- df %>% select(id, field=field_id, valid=valid_field, typical=typical_field, 
+                                reason=reason_field, duration=duration_field) %>%
+      mutate(field=ifelse(valid == "" & typical != "No" & reason == "" & !duration<5, field, NA)) %>% # replace with NA, if invalid 24hr 
+      select(id, field_id=field) %>% rename_with(., ~gsub("field_id", field_id, .))
+    valid_24hr
+  }) %>% reduce(full_join, by = "id") %>%
+    mutate(n_valid_24hr = rowSums(!is.na(across(paste0("p", field, "_i",0:4))))) %>%  # count n of valid 24hr
+    mutate(field_mean=ifelse(n_valid_24hr>0, rowSums(across(paste0("p", field, "_i",0:4)), na.rm=T)/n_valid_24hr, NA)) %>%
+    select(id, field_mean) %>%
+    rename_with(., ~gsub("field_mean", paste0("p", field, "_mean"), .)) %>%
+    pull(ends_with("mean"))
+}
+
+
+# Run over all 93 diet group fields
+diet_fields <- c("26002", codebook %>% pull(Field.ID))
+diet_means <- lapply(diet_fields, function(f) {
+  diet24hr %>% mutate(
+    field_mean=diet_valid_mean(f, .)) %>%
+    rename_with(., ~gsub("field", paste0("p", f), .)) %>%
+    select(id, ends_with("mean"))
+}) %>% reduce(full_join, by = "id")
+
+#diet_means_raw %>% fwrite("../data/processed/ukb_diet_mean24hr_raw.txt", sep="\t")
+
+
+# ======================================================================
+## Calculate intake of 13 food (g) and 2 beverage (mL) groups 
+# ======================================================================
+
+FoodGroups <- unique(codebook$FoodGroup.Name)
+
+build_foodgroup <- function(food_group, df) {
+  # For a given nutrient:
+  # - Select all columns for that nutrient
+  # - Tabule number of instances (not missing)
+  # - if >=2 instances, calculate mean; if not, code as NA
+  diet_vars_id <- codebook$Var.ID[codebook$FoodGroup.Name==food_group]
+  diet_vars_id <- paste0(diet_vars_id, "_mean") # diet_id_mean 
+  vars_dat <- df %>% select(id, all_of(diet_vars_id)) %>%
+    mutate(fg_dat = rowSums(across(all_of(diet_vars_id)), na.rm=T)) %>%
+    select(id, fg_dat) %>%
+    rename_with(., ~gsub("fg_dat", paste0(food_group, "_mean"), .)) %>%
+    pull(ends_with("mean"))
+  return(vars_dat)
+}
+
+diet_means <- diet_means %>% mutate(
+  fg_bevs_alcoholic=build_foodgroup("fg_bevs_alcoholic", .),
+  fg_cereals=build_foodgroup("fg_cereals", .),
+  fg_dairy_products=build_foodgroup("fg_dairy_products", .),
+  
+  fg_eggs=build_foodgroup("fg_eggs", .),
+  fg_fats_spreads=build_foodgroup("fg_fats_spreads", .),
+  fg_fish_dishes=build_foodgroup("fg_fish_dishes", .),
+  
+  fg_fruits=build_foodgroup("fg_fruits", .),
+  fg_meat_products=build_foodgroup("fg_meat_products", .),
+  fg_meat_substitutes=build_foodgroup("fg_meat_substitutes", .),
+  
+  fg_mixed_dishes=build_foodgroup("fg_mixed_dishes", .),
+  fg_bevs_nonalch=build_foodgroup("fg_bevs_nonalch", .),
+  fg_nuts_seeds=build_foodgroup("fg_nuts_seeds", .),
+  
+  fg_condiments=build_foodgroup("fg_condiments", .),
+  fg_sweets_snacks=build_foodgroup("fg_sweets_snacks", .),
+  fg_vegetables_potatoes=build_foodgroup("fg_vegetables_potatoes", .)
+  
+)
+
+
+# ======================================================================
+## Calculate intake of derived food/beverage groups for PCA analysis
+# ======================================================================
+
+pc_groups <- unique(codebook$DietPC.Group)
+
+build_pca_groups <- function(pc_group, df) {
+  # For a given group:
+  # - Select all columns for group
+  # - Tabulate number of instances (not missing)
+  # - if >=2 instances, calculate mean; if not, code as NA
+  diet_vars_id <- codebook$Var.ID[codebook$DietPC.Group==pc_group]
+  diet_vars_id <- paste0(diet_vars_id, "_mean") # diet_id_mean 
+  vars_dat <- df %>% select(id, all_of(diet_vars_id)) %>%
+    mutate(fg_dat = rowSums(across(all_of(diet_vars_id)), na.rm=T)) %>%
+    select(id, fg_dat) %>%
+    rename_with(., ~gsub("fg_dat", paste0(pc_group, "_mean"), .)) %>%
+    pull(ends_with("mean"))
+  return(vars_dat)
+}
+
+diet_for_pca <- lapply(pc_groups, function(pc) {
+  pc_mean <- paste0(pc, "_mean")
+  pc.dat <- diet_means %>% mutate(pc=build_pca_groups(pc, .)) %>% select(id, pc) %>%
+    rename_at("pc", ~gsub("pc", pc_mean, .))
+}) %>% reduce(full_join, by="id")
+
+
+diet_all <- full_join(diet_means, diet_for_pca, by="id")
+diet_all %>% fwrite("../data/processed/ukb_diet24hr.csv")
+diet_all %>% saveRDS("../data/processed/ukb_diet24hr.rda")
+
+
+## Combine 24HR and FFQ diet datasets ------------------
+
+diet_all_id <- diet_all %>% 
   left_join(., ffq_id, by = "id") %>%
+  rename(nut_kcal=p26002_mean) %>%
   
   ## Replace values >5SD with NA********************
-  mutate(across(c(diet_vars), ~winsorize(., SDs=5))) %>%
-  mutate(across(c(names(ffq_fields)), ~winsorize(., SDs=5)))
-
-
-print(paste0("Dietary data from UKB FFQs prepared for N = ", nrow(diet_all_id), " participants"))
-
-
-## FOR COMPARISON: make "raw" diet dataset without removing outliers
-diet_all_raw_id <- diet_id %>% 
-  left_join(., ffq_id, by = "id")
-  
-
-
-## 24HR dietary data
-
+  mutate(across(c(starts_with("fg_") | starts_with("pc_") | "nut_kcal"), ~winsorize(., SDs=5))) %>%
+  mutate(across(c(names(ffq_vars)), ~winsorize(., SDs=5)))
 
 
 
@@ -658,7 +565,7 @@ diet_all_raw_id <- diet_id %>%
 ## genetic ancestry ##
 ######################
 
-### Compile Pan-UKBB genetic PCs (use to create European subset) ------------------------------
+### Compile Pan-UKBB genetic PCs (use to create European subset) --------------
 
 anc_rel_id <- fread("/humgen/florezlab/UKBB_app27892/ukbreturn2442/all_pops_non_eur_pruned_within_pop_pc_covs_app27892.csv",
                     data.table=FALSE, stringsAsFactors=FALSE) %>% 
@@ -674,45 +581,49 @@ print("Breakdown of available data by relatedness & ancestry from PanUKBB: ")
 print(table(anc_rel_id$unrelated, anc_rel_id$ancestry))
 
 
+######################################
+##  Load in dietary traits from JC  ##
+######################################
 
-##############################
-## write PROCESSED datasets ##
-##############################
+## dietary phenotypes from JC -------------------
+
+diet_traits_fromJC <- fread("../data/processed/gwas/fromJC/BOLT_UKB_diet_genoQCEUR450K_phenotypes_ffq_QC_PCA_manuscript_12132018_florezconverstion.csv") %>%
+  rename(id=Florez_FID, 
+         oilyfish_QT=oilyfish_overallfreq.1329.average_QT,
+         alch_glasspermonth_QT=anyalcohol_glassespermonth.derived.average_QT,
+         bread_type_BIN=bread_typeused.1448.average_bin4)
+
+cat("Adding:", names(diet_traits_fromJC %>% select(-"id")))
+
+
 
 ### Merge phenotypes -------------------------------------------
 
 phenos <- phenos_id %>%
-  left_join(biomark_id, by="id") %>%
-  left_join(t2d_id, by ="id") %>%
   left_join(diet_all_id, by="id") %>%
   left_join(anc_rel_id, by="id") %>%
+  left_join(diet_traits_fromJC, by = "id") %>%
   filter(!(id %in% withdrawn_consent)) %>%
   mutate(id = format(id, scientific=FALSE)) %>%
   mutate(IID = id, ., before=id)
 
 
-# all participants
-#phenos %>% write_csv("../data/processed/ukb_phenos.csv")
 
-print(head(phenos))
-
+##############################
+## write PROCESSED datasets ##
+##############################
 
 # Unrelated subsets
 phenos %>%
-  filter(unrelated == TRUE) %>%
-  write_csv("../data/processed/ukb_phenos_unrelated.csv")
+  filter(unrelated == TRUE) %>% 
+  fwrite("../data/processed/ukb_phenos_unrelated.csv", row.names = F, col.names = T)
 
+
+# Unrealted & EUR subjects
 phenos %>%
   filter(unrelated == TRUE) %>%
-  saveRDS("../data/processed/ukb_phenos_unrelated.rda")
-
-
-## Merge phenotypes with RAW dietary data -----------------------
-unrelated_id <- (phenos %>% filter(unrelated == TRUE) %>% select(id))[[1]]
-diet_all_raw_id %>%
-  filter(id %in% unrelated_id) %>%
-  mutate(id = format(id, scientific=FALSE)) %>%
-  saveRDS("../data/processed/ukb_diet_raw_unrelated.rda")
+  filter(ancestry == "EUR") %>%
+  saveRDS("../data/processed/ukb_phenos_unrelated_EUR.rda")
 
 
 print("Done preparing UKB Phenotype data. Datasets are ready for analysis.")

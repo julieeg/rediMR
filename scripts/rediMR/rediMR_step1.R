@@ -18,18 +18,18 @@ source("../scripts/pantry.R")
 # ==========================
 
 args <- commandArgs(trailingOnly = TRUE)
-exposure = args[1] # "oilyfish_QT"
-outcome = args[2] # "tg" 
+exposure = args[1] # "bread_type_BIN"
+outcome = args[2] # "ldl" 
 sumstats = args[3] # ../data/sumstats/standardized_shared_from_KSJ/std_mrdat_oilyfish_GCST90239664_TG_Graham_GRCh37.csv
 covarset = args[4] #"confounders1"
-tag = args[5] # "vCole" 
-saveDir= args[6] #../data/processed/rediMR/vCole/oilyfish_QT_tg
+tag = args[5] # "vCole" "ms" (for manuscript)
+saveDir= args[6] #../data/processed/rediMR/oilyfish_QT_tg
 
-phenofile = "../data/processed/ukb_phenos_unrelated_EUR_withJC_diet_traits_09292024.txt"
+phenofile = "../data/processed/ukb_phenos_unrelated_EUR.rda"
 genofile = paste0(saveDir, "/", exposure, "_", outcome, "_snpsInput.raw")
 covars_gwas="age sex gPC1 gPC2 gPC3 gPC4 gPC5 gPC6 gPC7 gPC8 gPC9 gPC10" #args[3]
 
-savePref = paste0(exposure, "_", outcome, "_", covarset)
+savePref = paste0(saveDir, "_", covarset)
 
 
 ## Inputs & parameters
@@ -63,7 +63,7 @@ dose_id <- dose %>% rename(id=FID) %>% select(-c(IID, MAT, PAT, SEX, PHENOTYPE )
 snps <- names(dose_id %>% select(-id))
 
 # phenotype file with covariates 
-phenos_id <- fread(phenofile)
+phenos_id <- readRDS(phenofile)
 
 # Define covariate set
 covarSet <- covarSets[[covarset]]
@@ -72,18 +72,40 @@ covarSet <- covarSets[[covarset]]
 # ==================================
 ## Build dietPCs without exposure 
 # ==================================
- 
-if(any(startsWith(covarSet$Covars, "dietPC"))) {
-  
-  if(exposure == "oilyfish_QT") { 
-    exclude <- "oily_fish"
-  } else if(exposure == "bread_type_BIN") { 
-    exclude <- c("bread_type_white_vs_brown_or_whole", "bread_intake")
-  } else if (exposure == "alch_glasspermonth_QT") {
-    exclude <- "none"
+
+if(length(covarSet$Covars) == 1) {
+  covars_adjust.vars <- strsplit(covarSet$Covars, "[+]")[[1]] } else {
+    covars_adjust.vars <- covarSet$Covars
   }
+
+if(any(startsWith(covars_adjust.vars, "diet"))) {
   
-  dietpcs = derive_dietPCs(exposure, exclude, data=phenos_id)
+  # Using FFQ diet PCs
+  if(any(startsWith(covars_adjust.vars, "dietPC"))) {
+    dietdata = "FFQ"
+    
+    if(exposure == "oilyfish_QT") { 
+      exclude <- "oily_fish"
+    } else if(exposure == "bread_type_BIN") { 
+      exclude <- c("bread_type_white_vs_brown_or_whole", "bread_intake")
+    } else if (exposure == "alch_glasspermonth_QT") {
+      exclude <- "none"
+    }
+    
+    # Using FFQ diet PCs
+    } else if(any(startsWith(covars_adjust.vars, "diet24hrPC"))) {
+    dietdata = "24HR"
+    
+    if(exposure == "oilyfish_QT") { 
+      exclude <- "pc_fish_mean"
+    } else if(exposure == "bread_type_BIN") { 
+      exclude <- c("pc_refgrain_mean", "pc_whgrain_mean")
+    } else if (exposure == "alch_glasspermonth_QT") {
+      exclude <- c("pc_beer_mean", "pc_wine_mean", "pc_spirits_mean")
+    }
+  }
+    
+  dietpcs = derive_dietPCs(exposure, exclude, dietdata, data=phenos_id)
   
   # Extract dietPC scores
   dietPCs.scores <- dietpcs$scores
@@ -105,10 +127,10 @@ phenos_id <- phenos_id %>%
   select(id, 
          all_of(exposure),
          all_of(strsplit(covars_gwas, split=" ")[[1]]),
-         all_of(covarSet$Covars)
+         all_of(adj_covars)
 ) 
 
-dat <- left_join(phenos_id, dose_id, by="id")
+dat <- left_join(phenos_id, dose_id %>% mutate(id=as.character(id)), by="id")
 
 cat("\nCovariates for gwas:", covars_gwas, 
     "\nCovariats for adjustment:", paste0("\n   - ",
@@ -130,7 +152,6 @@ cat("\n Calculating %change in Beta when adjusting for ALL covariates, relative 
 
 # For eacn SNP, tabulate pctBchange when adjusting for ALL covariates
 covars_gwas.vars <- strsplit(covars_gwas, " ")[[1]]
-covars_adjust.vars <- covarSet$Covars #strsplit(covars_adjust, " ")[[1]]
 
 tab_bchange_all <- do.call(rbind.data.frame, lapply(snps, function(snp) {
   pctBchange.fun(pheno=exposure, snp, 
@@ -165,7 +186,7 @@ head(tab_bchange_each)
 
 ## Compile rediMRdat for downstream analyses
 rbind.data.frame(tab_bchange_all, tab_bchange_each) %>%
-  write.csv(paste0(saveDir, "/", savePref, "_bchange_full_",tag,".csv"))
+  write.csv(paste0(savePref, "_bchange_full_",tag,".csv"))
 
 
 ##########################
