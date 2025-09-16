@@ -7,11 +7,11 @@
 #$ -j y
 
 
-exposure=$1 #oilyfish_QT
-outcome=$2 #tg
-sumstats=$3 #std_mrdat_oilyfish_GCST90239664_TG_Graham_GRCh37.csv
-covarset=$4 #confounders1
-tag=$5 #vCole
+exposure=$1 #bread_type_BIN
+outcome=$2 #ldl
+sumstats=$3 #std_mrdat_whiteXwholegrain_GCST90239658_LDL_Graham.csv
+covarset=$4 #confounders1 / alldiet24pcs
+tag=$5 #vCole / vPC
 
 phenofile=../data/processed/ukb_phenos_unrelated_EUR_withJC_diet_traits_09292024.txt 
 covars_gwas="age sex gPC1 gPC2 gPC3 gPC4 gPC5 gPC6 gPC7 gPC8 gPC9 gPC10"

@@ -184,6 +184,7 @@ diet24rAddConf_add <- lapply(1:length(confounder_Label), function(i) {list(
 
 ## append
 covarSets <- c(covarSets, dietEachConf_add, dietAddConf_add, diet24hrEachConf_add, diet24rAddConf_add) 
+#covarSets <- c(covarSets, dietEachConf_add, dietAddConf, diet24hrEachConf, diet24hrAddConf) 
 names(covarSets)
 
 

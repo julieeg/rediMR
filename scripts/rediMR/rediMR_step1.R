@@ -26,7 +26,7 @@ tag = args[5] # "vCole" "ms" (for manuscript)
 saveDir= args[6] #../data/processed/rediMR/oilyfish_QT_tg
 
 phenofile = "../data/processed/ukb_phenos_unrelated_EUR.rda"
-genofile = paste0(saveDir, "/", exposure, "_", outcome, "_snpsInput.raw")
+genofile = paste0(saveDir, "_snpsInput.raw")
 covars_gwas="age sex gPC1 gPC2 gPC3 gPC4 gPC5 gPC6 gPC7 gPC8 gPC9 gPC10" #args[3]
 
 savePref = paste0(saveDir, "_", covarset)
@@ -92,7 +92,7 @@ if(any(startsWith(covars_adjust.vars, "diet"))) {
       exclude <- "none"
     }
     
-    # Using FFQ diet PCs
+    # Using 24HR diet PCs
     } else if(any(startsWith(covars_adjust.vars, "diet24hrPC"))) {
     dietdata = "24HR"
     
